@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+      - name: Check Java formatting
+        run: ./mvnw -B -ntp spotless:check
+      - name: Validate deployment Compose configuration
+        env:
+          APP_IMAGE: order-inventory-system:ci
+          DB_HOST: database.example.invalid
+        run: docker compose --env-file .env.deploy.example -f compose.deploy.yaml config --quiet
+      - name: Test and package
+        run: ./mvnw -B -ntp verify
+      - name: Build and smoke-test the Compose stack
+        run: |
+          export DB_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$DB_PASSWORD"
+          cleanup() {
+            if [ "$?" -ne 0 ]; then
+              docker compose --profile app logs --no-color --tail=100 || true
+            fi
+            docker compose --profile app down --volumes
+          }
+          trap cleanup EXIT
+          docker compose --profile app up --build --wait --wait-timeout 120
+          curl --fail --silent --show-error http://127.0.0.1:8080/v3/api-docs >/dev/null
