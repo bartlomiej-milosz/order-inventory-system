@@ -1,14 +1,15 @@
 # Order & Inventory Management System
 
-A Spring Boot backend for managing B2B orders, stock levels, reservations, and stock movements. The repository currently contains the application infrastructure.
+A Spring Boot backend for managing B2B orders, stock levels, reservations, and stock movements. The repository contains the application infrastructure and the initial PostgreSQL schema.
 
 ## Scope and current status
 
 The v1 design has **8 domain tables** and supports multiple warehouses, with one warehouse per order. Confirmation reserves stock; fulfillment decreases physical stock; cancellation releases the reservation. Reservations are represented by CONFIRMED order items and the reserved counter, without a separate reservation table.
 
 - [Database diagram](docs/schema-design.drawio) — editable schema and design notes.
+- [SQL examples](docs/sql/queries.sql) — order totals, availability and stock reconciliation.
 
-Domain migrations, entities, order services and employee authentication are not implemented yet. The existing tests verify infrastructure only; they do not prove that the business workflow works. The next implementation step is the initial Flyway migration after completing the model checkpoint.
+Flyway V1 creates the eight domain tables. Integration tests check the schema, rejected writes and rollback on PostgreSQL. Entities, order services and employee authentication are planned for later milestones.
 
 ## Local development
 
@@ -51,6 +52,8 @@ The integration tests start their own PostgreSQL container through Testcontainer
 ## Database schema
 
 Flyway owns schema changes and Hibernate validates entity mappings at startup. Put versioned migrations under `src/main/resources/db/migration/` and qualify application objects with `inventory.`, for example `CREATE TABLE inventory.products (...)`. Flyway keeps its history in `flyway_history`. Add a new migration for every schema change after the initial migration has been applied.
+
+The [demo fixture](src/test/resources/sql/demo-data.sql) is loaded explicitly by tests and is never seeded during application startup. To explore the SQL examples, use a disposable PostgreSQL database with V1 applied and then load the fixture. Expected results include DEMO-002 totaling 45.50 PLN, DEMO-003 totaling 23.00 PLN, and WIDGET availability of 7 in NORTH and 4 in SOUTH. Both reconciliation queries should return no rows.
 
 ## Deployment configuration
 
