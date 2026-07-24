@@ -1,6 +1,6 @@
 # Order & Inventory Management System
 
-A Spring Boot backend for managing B2B orders, stock levels, reservations, and stock movements. The repository contains the application infrastructure and the initial PostgreSQL schema.
+A Spring Boot backend for managing B2B orders, stock levels, reservations, and stock movements. The repository contains the application infrastructure, the initial PostgreSQL schema, JPA mappings and employee authentication.
 
 ## Scope and current status
 
@@ -9,7 +9,7 @@ The v1 design has **8 domain tables** and supports multiple warehouses, with one
 - [Database diagram](docs/schema-design.drawio) — editable schema and design notes.
 - [SQL examples](docs/sql/queries.sql) — order totals, availability and stock reconciliation.
 
-Flyway V1 creates the eight domain tables. Integration tests check the schema, rejected writes and rollback on PostgreSQL. Entities, order services and employee authentication are planned for later milestones.
+Flyway V1 creates the eight domain tables, now mapped with JPA and checked by Hibernate at startup. Employees authenticate against `inventory.users` through HTTP Basic. Order, catalog and stock operations are planned for later milestones.
 
 ## Local development
 
@@ -38,6 +38,47 @@ curl -fsS http://127.0.0.1:8080/readyz
 
 The API and PostgreSQL ports are bound to loopback. Swagger UI is available in the `local` profile at `http://127.0.0.1:8080/swagger-ui.html`. Use `docker compose --profile app down` to stop the stack and keep the database volume.
 
+## Initial administrator and employee access
+
+Bootstrap is opt-in and requires an empty `inventory.users` table. A normal application startup never creates accounts. Passwords are stored as BCrypt hashes with a `{bcrypt}` prefix and cost 12; the bootstrap password must contain at least 14 Unicode characters and at most 72 UTF-8 bytes.
+
+Create a temporary password file without putting the password in shell history (Python 3 is used only for this local prompt):
+
+```sh
+umask 077
+mkdir -p secrets
+python3 - <<'PYTHON'
+from getpass import getpass
+from pathlib import Path
+with Path("secrets/bootstrap-admin-password").open("x", encoding="utf-8") as file:
+    file.write(getpass("Initial administrator password: "))
+PYTHON
+```
+
+Then run the one-shot command and remove the file after success:
+
+```sh
+BOOTSTRAP_ADMIN_EMAIL=admin@example.test \
+BOOTSTRAP_ADMIN_PASSWORD_FILE="$PWD/secrets/bootstrap-admin-password" \
+make bootstrap-admin && rm secrets/bootstrap-admin-password && make run-local
+```
+
+The `bootstrap-admin` Spring profile disables the HTTP server, creates the administrator in a transaction, closes the context and exits. It refuses to overwrite or promote existing accounts. Concurrent bootstrap attempts are serialized by a table lock. Full account management is planned for a later release.
+
+| Endpoint | Access | Purpose |
+|---|---|---|
+| `GET /api/v1/auth/me` | ADMIN or OPERATOR | ID, normalized email and role of the current employee |
+| `GET /api/v1/auth/csrf` | ADMIN or OPERATOR | CSRF header name and masked token; also sets the CSRF cookie |
+| `GET /api/v1/users/{id}` | ADMIN | Read one employee account without its password hash |
+
+```sh
+curl --user admin@example.test http://127.0.0.1:8080/api/v1/auth/me
+```
+
+`curl` prompts for the password. The API checks credentials and current account state on every request; it does not persist authentication in an HTTP session. CSRF protection remains enabled for unsafe methods, using an HttpOnly, SameSite=Strict cookie and a token returned by `/api/v1/auth/csrf`. In `deploy`, the CSRF cookie is also Secure. Future write requests must send both the cookie and the returned token in the named header. Providing a CSRF token does not grant access to an unimplemented endpoint.
+
+Errors use `application/problem+json` with `type`, `title`, `status`, `detail` and `instance`. Anonymous or invalid credentials return 401 with a Basic challenge; insufficient permission returns 403; malformed IDs return 400; unknown employee IDs return 404. Database integrity conflicts use 409. Responses omit passwords, SQL and exception traces.
+
 ## Formatting and tests
 
 ```sh
@@ -47,7 +88,7 @@ make verify-build
 
 Spotless runs the same pinned version of `google-java-format` on application and test code locally and in CI. CI checks formatting before tests. Run `make format-java` to apply any required fixes locally.
 
-The integration tests start their own PostgreSQL container through Testcontainers. They check the database, Flyway initialization, health responses, and anonymous access. Compose and Testcontainers use the same PostgreSQL release. GitHub Actions runs the tests and starts the built container with PostgreSQL for a smoke test. It also validates the deployment Compose configuration using example values and prints container logs if the smoke test fails.
+The integration tests start their own PostgreSQL container through Testcontainers. They check the database, Flyway initialization, JPA mappings and lazy associations, health responses, employee authentication and authorization, CSRF, bootstrap races, constraints, and transaction rollback. Compose and Testcontainers use the same PostgreSQL release. GitHub Actions runs the tests and starts the built container with PostgreSQL for a smoke test. It also validates the deployment Compose configuration using example values and prints container logs if the smoke test fails.
 
 ## Database schema
 
@@ -59,7 +100,7 @@ The [demo fixture](src/test/resources/sql/demo-data.sql) is loaded explicitly by
 
 The release image defaults to the `deploy` profile. The Compose example targets a single Docker host with an HTTPS reverse proxy and an external PostgreSQL 17 server. The application listens on host loopback. PostgreSQL connections use TLS with CA and hostname verification. Use the server hostname from its certificate for `DB_HOST`.
 
-The security policy exposes `GET /livez` and `GET /readyz` with status only. Readiness checks database connectivity. All other application routes are denied in deployment until authentication and authorization are implemented. Configure the reverse proxy to expose the routes you need over HTTPS.
+The security policy exposes `GET /livez` and `GET /readyz` with status only. Readiness checks database connectivity. Employee routes require HTTP Basic; all unlisted routes remain denied. Terminate HTTPS at the reverse proxy and keep the application port on loopback. HTTP Basic credentials must only travel over HTTPS outside local development.
 
 ### Provision PostgreSQL
 
