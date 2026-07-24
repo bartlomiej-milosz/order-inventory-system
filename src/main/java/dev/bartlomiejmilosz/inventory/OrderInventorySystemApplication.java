@@ -7,6 +7,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class OrderInventorySystemApplication {
 
   public static void main(String[] args) {
-    SpringApplication.run(OrderInventorySystemApplication.class, args);
+    var context = SpringApplication.run(OrderInventorySystemApplication.class, args);
+    if (context.getEnvironment().matchesProfiles("bootstrap-admin")) {
+      context.close();
+    }
   }
 }

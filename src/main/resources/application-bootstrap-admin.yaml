@@ -1,0 +1,7 @@
+spring:
+  main:
+    web-application-type: none
+inventory:
+  bootstrap:
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    password-file: ${BOOTSTRAP_ADMIN_PASSWORD_FILE:}

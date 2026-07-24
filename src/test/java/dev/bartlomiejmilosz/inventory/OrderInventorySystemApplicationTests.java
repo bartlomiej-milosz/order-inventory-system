@@ -51,7 +51,7 @@ class OrderInventorySystemApplicationTests {
 
       for (String path :
           new String[] {"/api/v1/products", "/actuator/env", "/v3/api-docs", "/swagger-ui.html"}) {
-        assertThat(get(client, path).statusCode()).as(path).isEqualTo(403);
+        assertThat(get(client, path).statusCode()).as(path).isEqualTo(401);
       }
     }
   }

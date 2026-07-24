@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help init-env start-stack start-db run-local stop-stack stack-status stack-logs app-shell check-readiness format-java verify-build
+.PHONY: help init-env start-stack start-db run-local stop-stack stack-status stack-logs app-shell check-readiness bootstrap-admin format-java verify-build
 .PHONY: env up db run down ps logs shell health verify
 
 help:
@@ -9,6 +9,7 @@ help:
 		'make start-stack      Build and start the backend and PostgreSQL in Docker' \
 		'make start-db         Start PostgreSQL for development in the IDE' \
 		'make run-local        Start PostgreSQL in Docker and run the backend on your machine' \
+		'make bootstrap-admin        Create the first ADMIN from an explicit password file and exit' \
 		'make stop-stack       Stop the stack and keep the database volume' \
 		'make stack-status     Show container status' \
 		'make stack-logs       Follow logs for the local stack' \
@@ -36,6 +37,9 @@ start-db:
 
 run-local: start-db
 	@set -a && . ./.env && exec ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+
+bootstrap-admin: start-db
+	@set -a && . ./.env && exec ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,bootstrap-admin -Dspring-boot.run.jvmArguments=-Dspring.devtools.restart.enabled=false
 
 stop-stack:
 	docker compose --profile app down
