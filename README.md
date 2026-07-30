@@ -96,6 +96,28 @@ Flyway owns schema changes and Hibernate validates entity mappings at startup. P
 
 The [demo fixture](src/test/resources/sql/demo-data.sql) is loaded explicitly by tests and is never seeded during application startup. To explore the SQL examples, use a disposable PostgreSQL database with V1 applied and then load the fixture. Expected results include DEMO-002 totaling 45.50 PLN, DEMO-003 totaling 23.00 PLN, and WIDGET availability of 7 in NORTH and 4 in SOUTH. Both reconciliation queries should return no rows.
 
+### Flyway maintenance from the terminal
+
+For the existing local database:
+
+```sh
+make validate-db-migrations
+make repair-db-migrations
+```
+
+Validation checks history without changing it. Run repair only after reviewing the mismatch, such as confirming that the SQL change was formatting only. Repair updates Flyway history; it does not reapply SQL or synchronize table structure. For a structural change, restore the original applied migration and add the next version.
+
+These commands start the existing PostgreSQL service, export `.env`, respect `DB_PORT`, and run the Flyway Maven plugin directly on your machine. The plugin uses the same Flyway/PostgreSQL versions as the application and the same migration directory and history schema. It is not bound to the Maven build lifecycle. `clean` is disabled.
+
+The equivalent direct Maven command is:
+
+```sh
+set -a && . ./.env && set +a
+FLYWAY_URL="jdbc:postgresql://127.0.0.1:${DB_PORT:-5432}/order_inventory" ./mvnw flyway:repair
+```
+
+Replace `repair` with `validate` to check history. The flag `-Dspring-boot.run.profiles=local` applies only to `spring-boot:run`; it does not configure the Flyway Maven plugin. This plugin has its own explicit local connection configuration and does not read Spring's YAML files. The helpers target local development; deployment migrations still use Spring Boot with the dedicated migrator role.
+
 ## Deployment configuration
 
 The release image defaults to the `deploy` profile. The Compose example targets a single Docker host with an HTTPS reverse proxy and an external PostgreSQL 17 server. The application listens on host loopback. PostgreSQL connections use TLS with CA and hostname verification. Use the server hostname from its certificate for `DB_HOST`.

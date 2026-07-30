@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help init-env start-stack start-db run-local stop-stack stack-status stack-logs app-shell check-readiness bootstrap-admin format-java verify-build
+.PHONY: help init-env start-stack start-db run-local stop-stack stack-status stack-logs app-shell check-readiness bootstrap-admin validate-db-migrations repair-db-migrations format-java verify-build
 .PHONY: env up db run down ps logs shell health verify
 
 help:
@@ -15,6 +15,8 @@ help:
 		'make stack-logs       Follow logs for the local stack' \
 		'make app-shell        Open a shell in the backend container' \
 		'make check-readiness  Check backend readiness inside the container' \
+		'make validate-db-migrations Validate Flyway history in the local database' \
+		'make repair-db-migrations   Repair local Flyway history after reviewing migration changes' \
 		'make format-java      Format Java source and test files with google-java-format' \
 		'make verify-build     Check Java formatting and run Maven verification'
 
@@ -55,6 +57,12 @@ app-shell:
 
 check-readiness:
 	@docker compose --profile app exec -T app curl -fsS http://127.0.0.1:8080/readyz && printf '\n'
+
+validate-db-migrations: start-db
+	@set -a && . ./.env && export FLYWAY_URL="jdbc:postgresql://127.0.0.1:$${DB_PORT:-5432}/order_inventory" && exec ./mvnw flyway:validate
+
+repair-db-migrations: start-db
+	@set -a && . ./.env && export FLYWAY_URL="jdbc:postgresql://127.0.0.1:$${DB_PORT:-5432}/order_inventory" && exec ./mvnw flyway:repair
 
 format-java:
 	./mvnw spotless:apply

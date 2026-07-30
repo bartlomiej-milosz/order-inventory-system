@@ -131,6 +131,39 @@
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
 			<plugin>
+				<groupId>org.flywaydb</groupId>
+				<artifactId>flyway-maven-plugin</artifactId>
+				<version>${flyway.version}</version>
+				<configuration>
+					<url>jdbc:postgresql://127.0.0.1:5432/order_inventory</url>
+					<user>inventory_local</user>
+					<password>${env.DB_PASSWORD}</password>
+					<defaultSchema>flyway_history</defaultSchema>
+					<schemas>
+						<schema>flyway_history</schema>
+						<schema>inventory</schema>
+					</schemas>
+					<locations>
+						<location>filesystem:${project.basedir}/src/main/resources/db/migration</location>
+					</locations>
+					<createSchemas>false</createSchemas>
+					<baselineOnMigrate>false</baselineOnMigrate>
+					<cleanDisabled>true</cleanDisabled>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>org.flywaydb</groupId>
+						<artifactId>flyway-database-postgresql</artifactId>
+						<version>${flyway.version}</version>
+					</dependency>
+					<dependency>
+						<groupId>org.postgresql</groupId>
+						<artifactId>postgresql</artifactId>
+						<version>${postgresql.version}</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
 				<executions>
