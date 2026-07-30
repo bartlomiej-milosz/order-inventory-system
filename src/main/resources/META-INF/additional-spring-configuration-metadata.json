@@ -1,0 +1,14 @@
+{
+  "properties": [
+    {
+      "name": "inventory.bootstrap.email",
+      "type": "java.lang.String",
+      "description": "Email address of the first administrator."
+    },
+    {
+      "name": "inventory.bootstrap.password-file",
+      "type": "java.lang.String",
+      "description": "Path to the file containing the initial administrator password."
+    }
+  ]
+}
