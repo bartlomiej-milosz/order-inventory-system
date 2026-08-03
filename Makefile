@@ -1,24 +1,23 @@
 .DEFAULT_GOAL := help
 
 .PHONY: help init-env start-stack start-db run-local stop-stack stack-status stack-logs app-shell check-readiness bootstrap-admin validate-db-migrations repair-db-migrations format-java verify-build
-.PHONY: env up db run down ps logs shell health verify
 
 help:
 	@printf '%s\n' \
-		'make init-env         Create .env with a random local database password' \
-		'make start-stack      Build and start the backend and PostgreSQL in Docker' \
-		'make start-db         Start PostgreSQL for development in the IDE' \
-		'make run-local        Start PostgreSQL in Docker and run the backend on your machine' \
-		'make bootstrap-admin        Create the first ADMIN from an explicit password file and exit' \
-		'make stop-stack       Stop the stack and keep the database volume' \
-		'make stack-status     Show container status' \
-		'make stack-logs       Follow logs for the local stack' \
-		'make app-shell        Open a shell in the backend container' \
-		'make check-readiness  Check backend readiness inside the container' \
-		'make validate-db-migrations Validate Flyway history in the local database' \
-		'make repair-db-migrations   Repair local Flyway history after reviewing migration changes' \
-		'make format-java      Format Java source and test files with google-java-format' \
-		'make verify-build     Check Java formatting and run Maven verification'
+		'make init-env                Create .env with a random local database password' \
+		'make start-stack             Build and start the backend and PostgreSQL in Docker' \
+		'make start-db                Start PostgreSQL for development in the IDE' \
+		'make run-local               Start PostgreSQL in Docker and run the backend on your machine' \
+		'make bootstrap-admin         Create the first ADMIN from an explicit password file and exit' \
+		'make stop-stack              Stop the stack and keep the database volume' \
+		'make stack-status            Show container status' \
+		'make stack-logs              Follow logs for the local stack' \
+		'make app-shell               Open a shell in the backend container' \
+		'make check-readiness         Check backend readiness inside the container' \
+		'make validate-db-migrations  Validate Flyway history in the local database' \
+		'make repair-db-migrations    Repair local Flyway history after reviewing migration changes' \
+		'make format-java             Format Java source and test files with google-java-format' \
+		'make verify-build            Check Java formatting and run Maven verification'
 
 init-env:
 	@if [ -e .env ] || [ -L .env ]; then \
@@ -69,16 +68,3 @@ format-java:
 
 verify-build:
 	./mvnw spotless:check verify
-
-# Keep existing commands usable.
-env: init-env
-up: start-stack
-db: start-db
-run: run-local
-down: stop-stack
-ps: stack-status
-logs: stack-logs
-shell: app-shell
-health: check-readiness
-format: format-java
-verify: verify-build
