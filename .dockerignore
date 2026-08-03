@@ -7,3 +7,23 @@
 !src/
 !src/main/
 !src/main/**
+
+# Keep local credentials and backups out even when placed in src/main.
+**/.env
+**/.env.*
+**/.envrc
+**/secrets
+**/bootstrap-admin-password
+**/db-password
+**/flyway-password
+**/.pgpass
+**/.pg_service.conf
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/backups
+**/*.dump
+**/*.sql.gz

@@ -34,11 +34,28 @@ build/
 
 ### OS ###
 .DS_Store
+
+### Local credentials and database backups ###
 .env
 .env.*
-!.env.example
-!.env.deploy.example
+!/.env.example
+!/.env.deploy.example
+.envrc
 secrets/
+bootstrap-admin-password
+db-password
+flyway-password
+.pgpass
+.pg_service.conf
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+/backups/
+*.dump
+*.sql.gz
 
 ### draw.io editor backups ###
 **/.$*.drawio.bkp
