@@ -40,7 +40,7 @@ class EntityMappingTests {
   }
 
   @Test
-  @Sql("/sql/demo-data.sql")
+  @Sql("/sql/seed.sql")
   void readsAllEightEntitiesFromTheExistingMigration() {
     assertThat(entities.getMetamodel().getEntities()).hasSize(8);
     EmployeeUser user = entities.find(EmployeeUser.class, id(101));
@@ -139,7 +139,7 @@ class EntityMappingTests {
   }
 
   @Test
-  @Sql("/sql/demo-data.sql")
+  @Sql("/sql/seed.sql")
   void keepsAssociationsLazyAndRequiresLoadingBeforeDetachment() {
     SalesOrder order = entities.find(SalesOrder.class, id(602));
     assertThat(Hibernate.isInitialized(order.getCustomer())).isFalse();

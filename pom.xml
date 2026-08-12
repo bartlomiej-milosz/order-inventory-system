@@ -125,6 +125,18 @@
 	</dependencies>
 
 	<build>
+		<testResources>
+			<testResource>
+				<directory>src/test/resources</directory>
+			</testResource>
+			<testResource>
+				<directory>demo/sql</directory>
+				<targetPath>sql</targetPath>
+				<includes>
+					<include>seed.sql</include>
+				</includes>
+			</testResource>
+		</testResources>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>

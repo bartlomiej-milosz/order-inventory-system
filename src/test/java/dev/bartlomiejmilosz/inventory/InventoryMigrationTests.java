@@ -68,7 +68,7 @@ class InventoryMigrationTests {
 
   @Test
   @Transactional
-  @Sql("/sql/demo-data.sql")
+  @Sql("/sql/seed.sql")
   void keepsStockSeparateByWarehouseAndStoresTheOrderedPrice() {
     assertThat(
             jdbc.queryForList(
@@ -126,7 +126,7 @@ class InventoryMigrationTests {
           delete referenced warehouse     | 23503 | DELETE FROM inventory.warehouses WHERE code = 'NORTH'
           """)
   @Transactional
-  @Sql("/sql/demo-data.sql")
+  @Sql("/sql/seed.sql")
   void rejectsInvalidData(String description, String sqlState, String sql) {
     assertThatThrownBy(() -> jdbc.update(sql))
         .as(description)
