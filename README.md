@@ -1,164 +1,206 @@
 # Order & Inventory Management System
 
-A Spring Boot backend for managing B2B orders, stock levels, reservations, and stock movements. The repository contains the application infrastructure, the initial PostgreSQL schema, JPA mappings and employee authentication.
+A Java 25 / Spring Boot backend for employees managing B2B orders across warehouses. Each order belongs to one customer and one warehouse. In the order model, confirming three units reserves them, fulfilling the order records their physical issue, and cancelling a confirmed order releases them. If a warehouse holds ten units and three are reserved, seven are available.
 
-## Scope and current status
+**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in, role-based account lookup, health checks, local Swagger UI and a SQL demo. The order lifecycle, catalog editing, stock receipts and adjustments are planned API features. The SQL demo lets you explore the underlying model today. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
 
-The v1 design has **8 domain tables** and supports multiple warehouses, with one warehouse per order. Confirmation reserves stock; fulfillment decreases physical stock; cancellation releases the reservation. Reservations are represented by CONFIRMED order items and the reserved counter, without a separate reservation table.
+[Run locally](#run-locally) · [Create the first administrator](#initial-administrator-and-employee-access) · [Develop and test](#develop-and-test) · [Deploy on a server](#deploy-on-a-server) · [Troubleshooting](#troubleshooting)
 
-- [Database diagram](docs/schema-design.drawio) — editable schema and design notes.
-- [SQL examples](docs/sql/queries.sql) — order totals, availability and stock reconciliation.
+## Run locally
 
-Flyway V1 creates the eight domain tables, now mapped with JPA and checked by Hibernate at startup. Employees authenticate against `inventory.users` through HTTP Basic. Order, catalog and stock operations are planned for later milestones.
+Use a macOS or Linux terminal with Git, Bash, Make, OpenSSL, curl and Docker with the Compose v2 plugin. Start the Docker engine. The full-stack path builds Java inside Docker. A host JDK is needed only to run Maven or develop in an IDE.
 
-## Local development
+### 1. Start the application and database
 
-Use Java 25 and Docker with the Compose plugin. Maven is provided by the wrapper.
-
-Create `.env` once from `.env.example` and set a random development password. Use `openssl rand -hex 24` to generate one. Keep the same credentials while using the same local database volume. The Postgres image reads its initial password only when initializing an empty volume.
-
-**PostgreSQL in Docker, application in the IDE or Maven**
+From a new checkout:
 
 ```sh
-docker compose up --wait db
-set -a
-. ./.env
-set +a
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+git clone https://github.com/bartlomiej-milosz/order-inventory-system.git
+cd order-inventory-system
+make start-stack
+make check-readiness
 ```
 
-For an IDE run configuration, set `SPRING_PROFILES_ACTIVE=local` and `DB_PASSWORD`. Set `DB_PORT` or `APP_PORT` if you changed the respective port in `.env`.
+If you already have the checkout, run `make start-stack` in its root. All commands below use that directory. The first build downloads the JDK image and Maven dependencies. Make creates a private `.env` with a random local database password on first use. Compose starts PostgreSQL and the app in the background, Flyway applies migrations, and Hibernate checks the mappings. The readiness response should be `{"status":"UP"}`.
 
-**Entire stack in Docker**
+By default the API listens on host loopback port 8080 and PostgreSQL on loopback port 5432. To choose other host ports **before starting**, run `make init-env`, edit `APP_PORT` and `DB_PORT` in `.env`, then run `make start-stack`. Use the configured API port in browser and curl examples. Keep the generated `DB_PASSWORD` with the local database volume across restarts.
+
+<a id="initial-administrator-and-employee-access"></a>
+
+### 2. Create your login once
 
 ```sh
-docker compose --profile app up --build --wait
-curl -fsS http://127.0.0.1:8080/readyz
+make local-admin
 ```
 
-The API and PostgreSQL ports are bound to loopback. Swagger UI is available in the `local` profile at `http://127.0.0.1:8080/swagger-ui.html`. Use `docker compose --profile app down` to stop the stack and keep the database volume.
+At the terminal prompts, enter your email, enter your chosen password, and repeat it. Password input is hidden. Use at least 14 characters and at most 72 UTF-8 bytes. Save the password for the next step. This password signs an employee into the HTTP API. The generated `DB_PASSWORD` in `.env` connects the application to PostgreSQL.
 
-## Initial administrator and employee access
+The command runs the application image once against the local database, with HTTP disabled. It passes the password through standard input to a temporary file inside that container and removes the container when it finishes. Look for **Initial administrator created** and a successful exit. The account is active, has the ADMIN role, and stores a BCrypt hash. The database must contain zero employees. Once it has an account, sign in with that account on later runs. Loading the SQL test fixture into a fresh database also fills the users table, so use a separate database for that exercise.
 
-Bootstrap is opt-in and requires an empty `inventory.users` table. A normal application startup never creates accounts. Passwords are stored as BCrypt hashes with a `{bcrypt}` prefix and cost 12; the bootstrap password must contain at least 14 Unicode characters and at most 72 UTF-8 bytes.
+### 3. Make your first authenticated request
 
-Create a temporary password file without putting the password in shell history (Python 3 is used only for this local prompt):
-
-```sh
-umask 077
-mkdir -p secrets
-python3 - <<'PYTHON'
-from getpass import getpass
-from pathlib import Path
-with Path("secrets/bootstrap-admin-password").open("x", encoding="utf-8") as file:
-    file.write(getpass("Initial administrator password: "))
-PYTHON
-```
-
-Then run the one-shot command and remove the file after success:
-
-```sh
-BOOTSTRAP_ADMIN_EMAIL=admin@example.test \
-BOOTSTRAP_ADMIN_PASSWORD_FILE="$PWD/secrets/bootstrap-admin-password" \
-make bootstrap-admin && rm secrets/bootstrap-admin-password && make run-local
-```
-
-The `bootstrap-admin` Spring profile disables the HTTP server, creates the administrator in a transaction, closes the context and exits. It refuses to overwrite or promote existing accounts. Concurrent bootstrap attempts are serialized by a table lock. Full account management is planned for a later release.
-
-| Endpoint | Access | Purpose |
-|---|---|---|
-| `GET /api/v1/auth/me` | ADMIN or OPERATOR | ID, normalized email and role of the current employee |
-| `GET /api/v1/auth/csrf` | ADMIN or OPERATOR | CSRF header name and masked token; also sets the CSRF cookie |
-| `GET /api/v1/users/{id}` | ADMIN | Read one employee account without its password hash |
+Replace the email below with the one you entered. Curl prompts for the password.
 
 ```sh
 curl --user admin@example.test http://127.0.0.1:8080/api/v1/auth/me
 ```
 
-`curl` prompts for the password. The API checks credentials and current account state on every request; it does not persist authentication in an HTTP session. CSRF protection remains enabled for unsafe methods, using an HttpOnly, SameSite=Strict cookie and a token returned by `/api/v1/auth/csrf`. In `deploy`, the CSRF cookie is also Secure. Future write requests must send both the cookie and the returned token in the named header. Providing a CSRF token does not grant access to an unimplemented endpoint.
-
-Errors use `application/problem+json` with `type`, `title`, `status`, `detail` and `instance`. Anonymous or invalid credentials return 401 with a Basic challenge; insufficient permission returns 403; malformed IDs return 400; unknown employee IDs return 404. Database integrity conflicts use 409. Responses omit passwords, SQL and exception traces.
-
-## Formatting and tests
+Expect HTTP 200 and a response shaped like `{"id":"<uuid>","email":"admin@example.test","role":"ADMIN"}`. You can now paste the returned UUID into the employee lookup in [local Swagger UI](http://127.0.0.1:8080/swagger-ui.html). Click **Authorize**, enter the employee credentials, then use **Try it out**. The demo scripts also show the anonymous and signed-in responses side by side.
 
 ```sh
-make format-java
+./demo/api/health.sh
+./demo/api/employee-access.sh admin@example.test
+```
+
+For another port, prefix a demo command with `BASE_URL=http://127.0.0.1:8081`. The current endpoints are:
+
+| Request | Access | What you get |
+|---|---|---|
+| GET /livez and GET /readyz | Public | Process health and readiness, including database connectivity for readiness |
+| GET /api/v1/auth/me | ADMIN or OPERATOR | Your employee ID, normalized email and current role |
+| GET /api/v1/users/{id} | ADMIN | Employee details, including whether the account is active |
+| GET /api/v1/auth/csrf | ADMIN or OPERATOR | CSRF cookie and a response containing the header name and masked token |
+
+HTTP Basic authenticates each request. Changes to an account's role or active flag take effect on its next request. CSRF protection on unsafe methods requires both the cookie and the token in the named header. Swagger and the OpenAPI JSON at `/v3/api-docs` are available locally. Other application routes default to denied.
+
+### Stop and resume
+
+Use `make stack-status` for service state and `make stack-logs` to follow logs. Press Ctrl-C to leave the log viewer. Run `make stop-stack` when finished. It keeps the database volume. The next `make start-stack` reuses your data and employee login. Run `make help` for the full command list.
+
+## Develop and test
+
+**Run Java on your machine.** Install JDK 25 and check `java -version`. If the full Docker stack is running, use `make stop-stack` first to free the API port. Run `make run-local` to start PostgreSQL in Docker and the application in your terminal with the Maven Wrapper. The local database and administrator are shared with the full-stack workflow. Press Ctrl-C to stop Java, then `make stop-stack` to stop PostgreSQL. For an IDE, use `make start-db`, select profile `local`, and supply `DB_PASSWORD`, `DB_PORT` and `APP_PORT` from your local `.env` in the run configuration.
+
+**Existing password-file workflow.** The Maven target `make bootstrap-admin` also works with JDK 25. Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD_FILE` in `.env`. Supply a private, single-line UTF-8 file at that path and remove it after successful creation. The interactive `make local-admin` reads the email and password from its prompts.
+
+**Verify a change.** With JDK 25 and Docker running, use:
+
+```sh
 make verify-build
 ```
 
-Spotless runs the same pinned version of `google-java-format` on application and test code locally and in CI. CI checks formatting before tests. Run `make format-java` to apply any required fixes locally.
+This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite exercises migrations, constraints, rollback, entity mappings, roles, login, CSRF and concurrent bootstrap attempts. Use `make format-java` to apply the formatter. CI also builds the container and starts the local Compose stack for a smoke test. [CI workflow](.github/workflows/ci.yaml)
 
-The integration tests start their own PostgreSQL container through Testcontainers. They check the database, Flyway initialization, JPA mappings and lazy associations, health responses, employee authentication and authorization, CSRF, bootstrap races, constraints, and transaction rollback. Compose and Testcontainers use the same PostgreSQL release. GitHub Actions runs the tests and starts the built container with PostgreSQL for a smoke test. It also validates the deployment Compose configuration using example values and prints container logs if the smoke test fails.
+**Work with the schema.** Flyway manages the business tables in `inventory` and the migration history in `flyway_history`. Hibernate validates the mappings on startup. Add a new versioned migration for changes to an applied schema. Use `make validate-db-migrations` to check local migration history. The separate `make repair-db-migrations` command changes history metadata and should be used only after investigating and resolving a mismatch. It does not apply missing structural changes. [Migrations](src/main/resources/db/migration/) · [SQL reports](demo/sql/) · [Demo and test data](demo/sql/seed.sql)
 
-## Database schema
-
-Flyway owns schema changes and Hibernate validates entity mappings at startup. Put versioned migrations under `src/main/resources/db/migration/` and qualify application objects with `inventory.`, for example `CREATE TABLE inventory.products (...)`. Flyway keeps its history in `flyway_history`. Add a new migration for every schema change after the initial migration has been applied.
-
-The [demo fixture](src/test/resources/sql/demo-data.sql) is loaded explicitly by tests and is never seeded during application startup. To explore the SQL examples, use a disposable PostgreSQL database with V1 applied and then load the fixture. Expected results include DEMO-002 totaling 45.50 PLN, DEMO-003 totaling 23.00 PLN, and WIDGET availability of 7 in NORTH and 4 in SOUTH. Both reconciliation queries should return no rows.
-
-### Flyway maintenance from the terminal
-
-For the existing local database:
+**Explore orders and stock in SQL.** With JDK 25, Docker and the local environment from step 1, run the following from the repository root. Run setup once. It creates a separate `order_inventory_demo` database, migrates it and loads sample orders. The HTTP API keeps using `order_inventory`.
 
 ```sh
-make validate-db-migrations
-make repair-db-migrations
+./demo/sql/run.sh setup
+./demo/sql/run.sh orders
+./demo/sql/run.sh stock
+./demo/sql/run.sh consistency
 ```
 
-Validation checks history without changing it. Run repair only after reviewing the mismatch, such as confirming that the SQL change was formatting only. Repair updates Flyway history; it does not reapply SQL or synchronize table structure. For a structural change, restore the original applied migration and add the next version.
+Look for order DEMO-003 totaling 23.00 PLN and WIDGET availability of 7 in NORTH and 4 in SOUTH. Both consistency queries should return zero rows. Repeat the last three commands whenever you want to explore the data. [SQL demo guide](demo/README.md)
 
-These commands start the existing PostgreSQL service, export `.env`, respect `DB_PORT`, and run the Flyway Maven plugin directly on your machine. The plugin uses the same Flyway/PostgreSQL versions as the application and the same migration directory and history schema. It is not bound to the Maven build lifecycle. `clean` is disabled.
+## Deploy on a server
 
-The equivalent direct Maven command is:
+The deployment configuration runs one application container on a Linux Docker host. A reverse proxy on that host accepts HTTPS traffic and forwards it to the application's loopback port. The application connects over TLS to a separately managed PostgreSQL 17 server. Provision the host, DNS name, proxy and database first. Run the shell commands from a checkout of the intended release on the Docker host, in a fresh shell so exported local settings cannot override the deployment environment.
+
+### 1. Choose the application image
+
+To build on the deployment host, give the image a tag identifying the checked-out revision:
 
 ```sh
-set -a && . ./.env && set +a
-FLYWAY_URL="jdbc:postgresql://127.0.0.1:${DB_PORT:-5432}/order_inventory" ./mvnw flyway:repair
+git rev-parse --short HEAD
+docker build -t "order-inventory-system:$(git rev-parse --short HEAD)" .
 ```
 
-Replace `repair` with `validate` to check history. The flag `-Dspring-boot.run.profiles=local` applies only to `spring-boot:run`; it does not configure the Flyway Maven plugin. This plugin has its own explicit local connection configuration and does not read Spring's YAML files. The helpers target local development; deployment migrations still use Spring Boot with the dedicated migrator role.
+Build from a clean release checkout so the tag identifies the source. Use the resulting tag as `APP_IMAGE` below. If you publish images separately, pull your image onto the host and use its registry reference pinned by digest. The repository CI builds and tests an image. Publishing to a registry is a separate step.
 
-## Deployment configuration
+### 2. Provision a new database
 
-The release image defaults to the `deploy` profile. The Compose example targets a single Docker host with an HTTPS reverse proxy and an external PostgreSQL 17 server. The application listens on host loopback. PostgreSQL connections use TLS with CA and hostname verification. Use the server hostname from its certificate for `DB_HOST`.
-
-The security policy exposes `GET /livez` and `GET /readyz` with status only. Readiness checks database connectivity. Employee routes require HTTP Basic; all unlisted routes remain denied. Terminate HTTPS at the reverse proxy and keep the application port on loopback. HTTP Basic credentials must only travel over HTTPS outside local development.
-
-### Provision PostgreSQL
-
-Run the following as a database administrator in `psql` to create the dedicated database and set two role passwords interactively.
-
-```sql
-CREATE DATABASE order_inventory;
-CREATE ROLE inventory_migrator LOGIN;
-CREATE ROLE inventory_app LOGIN;
-\password inventory_migrator
-\password inventory_app
-```
-
-Connect as the administrator to `order_inventory` before applying these grants.
-
-```sql
-REVOKE CONNECT, TEMPORARY ON DATABASE order_inventory FROM PUBLIC;
-REVOKE ALL ON SCHEMA public FROM PUBLIC;
-GRANT CONNECT ON DATABASE order_inventory TO inventory_migrator, inventory_app;
-CREATE SCHEMA flyway_history AUTHORIZATION inventory_migrator;
-CREATE SCHEMA inventory AUTHORIZATION inventory_migrator;
-GRANT USAGE ON SCHEMA inventory TO inventory_app;
-
-ALTER DEFAULT PRIVILEGES FOR ROLE inventory_migrator IN SCHEMA inventory
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO inventory_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE inventory_migrator IN SCHEMA inventory
-    GRANT USAGE ON SEQUENCES TO inventory_app;
-```
-
-Flyway connects as the schema owner during startup. The application's connection pool uses the data access role. Grant privileges explicitly for any existing objects if adapting these steps to a pre-provisioned database. If you choose different database or role names, use those names consistently in the SQL and deployment environment.
-
-### Run the release image
-
-Copy `.env.deploy.example` to `.env.deploy`, set `APP_IMAGE` to a release image by digest, and fill in the database connection settings. Provide the server CA PEM and two separate password files at the configured paths. Write each password without a trailing newline. On a Linux Docker host, file-backed Compose secrets retain their source permissions. Grant the container user (UID/GID `10001:10001`) read access to the password files without making them world-readable.
+Use a PostgreSQL administrator with permission to create a database and roles. From the repository root on a machine with `psql`, set the connection to your external server. Replace the hostname, administrator login and CA path below with your own. Check the destination shown by the first command before running the provisioning script.
 
 ```sh
+export PGHOST=db.example.com PGPORT=5432 PGUSER=your_db_admin
+export PGSSLMODE=verify-full PGSSLROOTCERT=/path/to/provider-ca.pem
+psql -X -d postgres -c '\conninfo'
+psql -X -d postgres -f deploy/provision.sql
+```
+
+Use the script once on a fresh installation. It creates `order_inventory`, prompts for the **inventory_migrator** password first and the **inventory_app** password second, then creates the schemas and grants. Flyway connects as schema owner, while application queries use the data access role. If a provider has already created these objects, apply the corresponding grants for that database and its roles. [Provisioning SQL](deploy/provision.sql)
+
+### 3. Configure the container and secrets
+
+On first setup, create the host configuration and its secrets directory:
+
+```sh
+umask 077
+mkdir -p secrets
+cp -n .env.deploy.example .env.deploy
+```
+
+Edit `.env.deploy` with these settings:
+
+| Setting | Value on your host |
+|---|---|
+| APP_IMAGE | Tag from step 1 or your published image digest |
+| DB_HOST, DB_PORT | PostgreSQL hostname matching its TLS certificate and its port, reachable from the container |
+| DB_NAME, DB_USER, FLYWAY_USER | Defaults match step 2 |
+| DB_CA_CERT_SOURCE | Host path to the database provider's trusted CA certificate in PEM format |
+| DB_PASSWORD_FILE, FLYWAY_PASSWORD_FILE | Host paths containing the application and migration role passwords from step 2 |
+| APP_PORT | Host loopback port for the reverse proxy, default 8080 |
+
+Place the provider's CA at `secrets/db-ca.pem` when using the default paths. The following commands are for **Bash on a Linux host with rootful Docker**, on first setup. Enter the two database passwords from step 2. The files contain the exact password bytes without a trailing newline.
+
+```bash
+umask 077
+read -rsp 'inventory_app password: ' app_pw && printf '\n'
+printf '%s' "$app_pw" > secrets/db-password
+unset app_pw
+read -rsp 'inventory_migrator password: ' migration_pw && printf '\n'
+printf '%s' "$migration_pw" > secrets/flyway-password
+unset migration_pw
+sudo chown 10001:10001 secrets/db-password secrets/flyway-password
+sudo chmod 0400 secrets/db-password secrets/flyway-password
+chmod 0444 secrets/db-ca.pem
+```
+
+Compose mounts the files for the container user (UID/GID 10001). With rootless Docker or user namespace mapping, grant the mapped container UID read access on the host. The CA file contains the public CA certificate. The two role password files are private. Keep `.env.deploy` and the contents of `secrets/` on the deployment host. [Deployment template](.env.deploy.example) · [Compose service](compose.deploy.yaml)
+
+### 4. Start, bootstrap and check the deployment
+
+```sh
+docker compose --env-file .env.deploy -f compose.deploy.yaml config --quiet
 docker compose --env-file .env.deploy -f compose.deploy.yaml up -d --wait
 curl -fsS http://127.0.0.1:8080/readyz
+make deploy-admin
 ```
+
+Use the configured `APP_PORT` in the health check. Wait for `UP` before creating the first employee. At the prompts choose the employee email and password for this installation. The bootstrap container uses the same deployment image, TLS settings and database roles as the running service. Run this command once per fresh database.
+
+### 5. Enable public HTTPS
+
+Point your domain's DNS at the host. For example, with Caddy installed as a host service, add a site block to its Caddyfile and replace the example domain. Use the `APP_PORT` you selected above.
+
+```caddyfile
+inventory.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Allow inbound ports 80 and 443 to Caddy for automatic HTTPS. Validate the proxy configuration, reload it, then verify readiness and sign-in through your own domain. The backend's published port stays on loopback. [Caddy reverse proxy guide](https://caddyserver.com/docs/quick-starts/reverse-proxy)
+
+```sh
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+curl -fsS https://inventory.example.com/readyz
+curl --user admin@example.test https://inventory.example.com/api/v1/auth/me
+```
+
+Use the email from step 4. A successful public check yields `UP` followed by your ADMIN profile. Swagger is disabled in the deployment profile.
+
+**Operate and update.** Inspect service state with `docker compose --env-file .env.deploy -f compose.deploy.yaml ps`, and logs with the same prefix followed by `logs --tail=100 app`. Before updating, back up the external database and check the new migrations. Build or pull the new release, update `APP_IMAGE`, run `up -d --wait` with the same deployment file and repeat the HTTPS checks. Existing accounts persist in PostgreSQL.
+
+## Troubleshooting
+
+| Symptom | What to check |
+|---|---|
+| Local startup reports a port already in use | Choose a free APP_PORT or DB_PORT in .env, then rerun make start-stack. For IDE development, stop the containerized app before running the JVM. |
+| PostgreSQL rejects the local password after editing .env | The database initializes credentials only on first volume creation. Restore the matching DB_PASSWORD or change the database role password through an authorized connection. |
+| Bootstrap says the users table must be empty | An account already exists, possibly from a fixture. Use the existing login or a separate fresh demo database. The bootstrap command cannot reset a password. |
+| Login returns 401 | Use an active employee email and its employee password. Curl prompts when given only the email. |
+| Request returns 403 | Check the employee's role and the allowed endpoint. Unsafe methods also require CSRF protection. |
+| Deployment fails readiness | Inspect app logs. Verify DB_HOST against the certificate, CA trust, database reachability, secret permissions, and both roles' credentials and schema grants. |
