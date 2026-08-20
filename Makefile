@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help init-env start-stack start-db run-local stop-stack stack-status stack-logs app-shell check-readiness bootstrap-admin validate-db-migrations repair-db-migrations format-java verify-build
+.PHONY: help local-admin deploy-admin init-env start-stack start-db run-local stop-stack stack-status stack-logs app-shell check-readiness bootstrap-admin validate-db-migrations repair-db-migrations format-java verify-build
 
 help:
 	@printf '%s\n' \
@@ -8,6 +8,8 @@ help:
 		'make start-stack             Build and start the backend and PostgreSQL in Docker' \
 		'make start-db                Start PostgreSQL for development in the IDE' \
 		'make run-local               Start PostgreSQL in Docker and run the backend on your machine' \
+		'make local-admin             Prompt for the first ADMIN on the running local stack' \
+		'make deploy-admin            Prompt for the first ADMIN on the deployment host' \
 		'make bootstrap-admin         Create the first ADMIN from an explicit password file and exit' \
 		'make stop-stack              Stop the stack and keep the database volume' \
 		'make stack-status            Show container status' \
@@ -30,17 +32,23 @@ init-env:
 		) && printf '%s\n' 'Created .env.'; \
 	fi
 
-start-stack:
-	docker compose --profile app up --build --wait
+start-stack: init-env
+	@set -a && . ./.env && exec docker compose --profile app up --build --wait
 
-start-db:
-	docker compose up --wait db
+start-db: init-env
+	@set -a && . ./.env && exec docker compose up --wait db
 
 run-local: start-db
 	@set -a && . ./.env && exec ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 
 bootstrap-admin: start-db
 	@set -a && . ./.env && exec ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,bootstrap-admin -Dspring-boot.run.jvmArguments=-Dspring.devtools.restart.enabled=false
+
+local-admin:
+	@set -a && . ./.env && exec bash scripts/create-admin.sh local
+
+deploy-admin:
+	@bash scripts/create-admin.sh deploy
 
 stop-stack:
 	docker compose --profile app down
