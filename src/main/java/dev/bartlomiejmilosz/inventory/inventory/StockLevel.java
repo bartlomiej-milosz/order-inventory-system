@@ -2,6 +2,7 @@ package dev.bartlomiejmilosz.inventory.inventory;
 
 import dev.bartlomiejmilosz.inventory.catalog.Product;
 import dev.bartlomiejmilosz.inventory.shared.IdentifiedEntity;
+import dev.bartlomiejmilosz.inventory.shared.ResourceConflictException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -36,6 +37,19 @@ public class StockLevel extends IdentifiedEntity {
     this.product = product;
     this.warehouse = warehouse;
     this.updatedAt = Instant.now();
+  }
+
+  void applyDelta(int delta) {
+    long nextOnHand = (long) onHand + delta;
+    if (nextOnHand < reserved) {
+      throw new ResourceConflictException("Physical stock cannot fall below reserved stock.");
+    }
+    if (nextOnHand > Integer.MAX_VALUE) {
+      throw new ResourceConflictException(
+          "The resulting stock quantity exceeds the supported range.");
+    }
+    onHand = (int) nextOnHand;
+    updatedAt = Instant.now();
   }
 
   public int getAvailable() {

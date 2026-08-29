@@ -9,6 +9,9 @@ spring:
       ddl-auto: validate
     properties:
       "[hibernate.default_schema]": inventory
+  jackson:
+    deserialization:
+      accept-float-as-int: false
   sql:
     init:
       mode: never

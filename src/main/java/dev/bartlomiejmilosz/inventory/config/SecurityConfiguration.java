@@ -45,6 +45,40 @@ class SecurityConfiguration {
               .requestMatchers(HttpMethod.GET, "/api/v1/auth/me", "/api/v1/auth/csrf")
               .hasAnyRole("ADMIN", "OPERATOR");
           requests.requestMatchers(HttpMethod.GET, "/api/v1/users/*").hasRole("ADMIN");
+          requests
+              .requestMatchers(
+                  HttpMethod.GET,
+                  "/api/v1/customers",
+                  "/api/v1/customers/*",
+                  "/api/v1/products",
+                  "/api/v1/products/*",
+                  "/api/v1/warehouses",
+                  "/api/v1/warehouses/*",
+                  "/api/v1/warehouses/*/stock",
+                  "/api/v1/warehouses/*/stock/*",
+                  "/api/v1/warehouses/*/stock/*/movements",
+                  "/api/v1/warehouses/*/stock/*/movements/*")
+              .hasAnyRole("ADMIN", "OPERATOR");
+          requests
+              .requestMatchers(HttpMethod.POST, "/api/v1/warehouses/*/stock/*/receipts")
+              .hasAnyRole("ADMIN", "OPERATOR");
+          requests
+              .requestMatchers(
+                  HttpMethod.POST,
+                  "/api/v1/customers",
+                  "/api/v1/products",
+                  "/api/v1/products/*/deactivate",
+                  "/api/v1/warehouses",
+                  "/api/v1/warehouses/*/deactivate",
+                  "/api/v1/warehouses/*/stock/*/adjustments")
+              .hasRole("ADMIN");
+          requests
+              .requestMatchers(
+                  HttpMethod.PUT,
+                  "/api/v1/customers/*",
+                  "/api/v1/products/*",
+                  "/api/v1/warehouses/*")
+              .hasRole("ADMIN");
           requests.anyRequest().denyAll();
         });
     return http.build();

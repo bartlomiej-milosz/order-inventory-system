@@ -1,11 +1,13 @@
 package dev.bartlomiejmilosz.inventory.shared;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -27,6 +29,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(ResourceNotFoundException.class)
   ResponseEntity<Object> notFound(ResourceNotFoundException ex, WebRequest request) {
     return response(HttpStatus.NOT_FOUND, HttpHeaders.EMPTY, request);
+  }
+
+  @ExceptionHandler(ResourceConflictException.class)
+  ProblemDetail stateConflict(ResourceConflictException ex, HttpServletRequest request) {
+    return ApiProblems.create(HttpStatus.CONFLICT, request.getRequestURI(), ex.getMessage());
+  }
+
+  @ExceptionHandler(InvalidRequestException.class)
+  ProblemDetail invalidRequest(InvalidRequestException ex, HttpServletRequest request) {
+    return ApiProblems.create(HttpStatus.BAD_REQUEST, request.getRequestURI(), ex.getMessage());
   }
 
   @ExceptionHandler(DataIntegrityViolationException.class)

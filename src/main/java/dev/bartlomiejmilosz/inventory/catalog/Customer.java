@@ -24,10 +24,14 @@ public class Customer extends IdentifiedEntity {
   protected Customer() {}
 
   public Customer(String name, String email, String phone) {
-    this.name = name;
-    this.email = email;
-    this.phone = phone;
+    update(name, email, phone);
     this.createdAt = Instant.now();
+  }
+
+  void update(String name, String email, String phone) {
+    this.name = name.strip();
+    this.email = email.strip();
+    this.phone = phone == null || phone.isBlank() ? null : phone.strip();
   }
 
   public String getName() {

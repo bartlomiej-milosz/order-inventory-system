@@ -20,9 +20,17 @@ public class Warehouse extends IdentifiedEntity {
   protected Warehouse() {}
 
   public Warehouse(String code, String name) {
-    this.code = code;
-    this.name = name;
+    update(code, name);
     this.active = true;
+  }
+
+  void update(String code, String name) {
+    this.code = code;
+    this.name = name.strip();
+  }
+
+  void deactivate() {
+    this.active = false;
   }
 
   public String getCode() {

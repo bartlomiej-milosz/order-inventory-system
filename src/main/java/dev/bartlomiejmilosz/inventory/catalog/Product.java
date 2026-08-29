@@ -28,11 +28,19 @@ public class Product extends IdentifiedEntity {
   protected Product() {}
 
   public Product(String sku, String name, BigDecimal unitPrice) {
-    this.sku = sku;
-    this.name = name;
-    this.unitPrice = unitPrice;
+    update(sku, name, unitPrice);
     this.active = true;
     this.createdAt = Instant.now();
+  }
+
+  void update(String sku, String name, BigDecimal unitPrice) {
+    this.sku = sku;
+    this.name = name.strip();
+    this.unitPrice = unitPrice;
+  }
+
+  void deactivate() {
+    this.active = false;
   }
 
   public String getSku() {
