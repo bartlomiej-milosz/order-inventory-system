@@ -20,6 +20,31 @@ BASE_URL=http://127.0.0.1:8081 ./demo/api/health.sh
 
 Use HTTPS for authenticated requests outside local development. The password is entered at the `curl` prompt.
 
+### Catalog and stock
+
+With the local stack running and an ADMIN account provisioned, run the following from the repository root. The script also needs `jq` and OpenSSL.
+
+```sh
+./demo/api/catalog-stock.sh admin@example.test
+```
+
+Enter the account password at the prompt. The script creates a fictional customer, a product and a warehouse with a fresh SKU and code on each run. It reads zero stock, records a 10-unit receipt and a correction of −2, then shows a rejected correction and the two persisted movements. The final physical and available stock are both 8. Run it against a local development database. The demo records stay in that database for inspection.
+
+| API path under `/api/v1` | Methods and roles |
+|---|---|
+| `/customers`, `/products`, `/warehouses` | `GET` for ADMIN/OPERATOR. `POST` for ADMIN. |
+| `/customers/{id}`, `/products/{id}`, `/warehouses/{id}` | `GET` for ADMIN/OPERATOR. `PUT` for ADMIN. |
+| `/products/{id}/deactivate`, `/warehouses/{id}/deactivate` | `POST` for ADMIN. Existing stock and history stay readable. |
+| `/warehouses/{warehouseId}/stock` | `GET` for ADMIN/OPERATOR. Lists recorded levels. |
+| `/warehouses/{warehouseId}/stock/{productId}` | `GET` for ADMIN/OPERATOR. An existing catalog pair without a stock row returns zero quantities. |
+| `…/stock/{productId}/receipts` | `POST` for ADMIN/OPERATOR with `quantity` and an optional `note`. |
+| `…/stock/{productId}/adjustments` | `POST` for ADMIN with a nonzero signed `quantityDelta` and a required `note`. Record a receipt first. |
+| `…/stock/{productId}/movements`, `…/movements/{movementId}` | `GET` for ADMIN/OPERATOR. Creation responses link to the recorded movement. |
+
+List endpoints accept `page` from 0 to 1,000,000 and `size` from 1 to 100. The defaults are page 0 and size 20. Warehouse codes and product SKUs use uppercase ASCII letters, digits, hyphens and underscores, starting with a letter or digit. Quantities are whole units and movement notes are limited to 500 characters. Stock changes need an active product and warehouse and must preserve `onHand >= reserved`.
+
+For your own write requests, first call `GET /api/v1/auth/csrf` with Basic credentials. Keep the response cookie and send the JSON `token` in the header named by `headerName`, along with the cookie and Basic credentials. The demo script handles this sequence.
+
 ## Local PostgreSQL
 
 With JDK 25 and Docker running, run `setup` once from the repository root after preparing `.env` using `make init-env`.

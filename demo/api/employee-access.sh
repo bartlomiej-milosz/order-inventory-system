@@ -9,5 +9,5 @@ fi
 # shellcheck source=demo/api/common.sh
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
-request 'Anonymous access' /api/v1/auth/me 401
-request 'Authenticated employee profile' /api/v1/auth/me 200 --user "$1"
+request GET 'Anonymous access' /api/v1/auth/me 401
+request GET 'Authenticated employee profile' /api/v1/auth/me 200 --user "$1"

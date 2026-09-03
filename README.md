@@ -2,7 +2,7 @@
 
 A Java 25 / Spring Boot backend for employees managing B2B orders across warehouses. Each order belongs to one customer and one warehouse. In the order model, confirming three units reserves them, fulfilling the order records their physical issue, and cancelling a confirmed order releases them. If a warehouse holds ten units and three are reserved, seven are available.
 
-**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in, role-based account lookup, health checks, local Swagger UI and a SQL demo. The order lifecycle, catalog editing, stock receipts and adjustments are planned API features. The SQL demo lets you explore the underlying model today. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
+**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in, customer, product and warehouse management, stock receipts and adjustments, movement history, health checks, local Swagger UI, and demos for the API and SQL. The order lifecycle remains planned. Its data model is available in the SQL demo. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
 
 [Run locally](#run-locally) · [Create the first administrator](#initial-administrator-and-employee-access) · [Develop and test](#develop-and-test) · [Deploy on a server](#deploy-on-a-server) · [Troubleshooting](#troubleshooting)
 
@@ -52,14 +52,16 @@ Expect HTTP 200 and a response shaped like `{"id":"<uuid>","email":"admin@exampl
 ./demo/api/employee-access.sh admin@example.test
 ```
 
-For another port, prefix a demo command with `BASE_URL=http://127.0.0.1:8081`. The current endpoints are:
+For another port, prefix a demo command with `BASE_URL=http://127.0.0.1:8081`. The health and employee endpoints are:
 
-| Request | Access | What you get |
-|---|---|---|
-| GET /livez and GET /readyz | Public | Process health and readiness, including database connectivity for readiness |
-| GET /api/v1/auth/me | ADMIN or OPERATOR | Your employee ID, normalized email and current role |
-| GET /api/v1/users/{id} | ADMIN | Employee details, including whether the account is active |
-| GET /api/v1/auth/csrf | ADMIN or OPERATOR | CSRF cookie and a response containing the header name and masked token |
+| Request                    | Access            | What you get                                                                |
+| -------------------------- | ----------------- | --------------------------------------------------------------------------- |
+| GET /livez and GET /readyz | Public            | Process health and readiness, including database connectivity for readiness |
+| GET /api/v1/auth/me        | ADMIN or OPERATOR | Your employee ID, normalized email and current role                         |
+| GET /api/v1/users/{id}     | ADMIN             | Employee details, including whether the account is active                   |
+| GET /api/v1/auth/csrf      | ADMIN or OPERATOR | CSRF cookie and a response containing the header name and masked token      |
+
+For customers, products, warehouses and stock movements, see the [catalog and stock endpoint table](demo/README.md#catalog-and-stock).
 
 HTTP Basic authenticates each request. Changes to an account's role or active flag take effect on its next request. CSRF protection on unsafe methods requires both the cookie and the token in the named header. Swagger and the OpenAPI JSON at `/v3/api-docs` are available locally. Other application routes default to denied.
 
@@ -79,7 +81,7 @@ Use `make stack-status` for service state and `make stack-logs` to follow logs. 
 make verify-build
 ```
 
-This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite exercises migrations, constraints, rollback, entity mappings, roles, login, CSRF and concurrent bootstrap attempts. Use `make format-java` to apply the formatter. CI also builds the container and starts the local Compose stack for a smoke test. [CI workflow](.github/workflows/ci.yaml)
+This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite covers migrations, constraints, rollback, entity mappings, employee access, CSRF, catalog operations, and concurrent bootstrap and first-receipt attempts. Use `make format-java` to apply the formatter. CI also builds the container and starts the local Compose stack for a smoke test. [CI workflow](.github/workflows/ci.yaml)
 
 **Work with the schema.** Flyway manages the business tables in `inventory` and the migration history in `flyway_history`. Hibernate validates the mappings on startup. Add a new versioned migration for changes to an applied schema. Use `make validate-db-migrations` to check local migration history. The separate `make repair-db-migrations` command changes history metadata and should be used only after investigating and resolving a mismatch. It does not apply missing structural changes. [Migrations](src/main/resources/db/migration/) · [SQL reports](demo/sql/) · [Demo and test data](demo/sql/seed.sql)
 
@@ -93,6 +95,8 @@ This checks Java formatting, runs tests and packages the app. Testcontainers sta
 ```
 
 Look for order DEMO-003 totaling 23.00 PLN and WIDGET availability of 7 in NORTH and 4 in SOUTH. Both consistency queries should return zero rows. Repeat the last three commands whenever you want to explore the data. [SQL demo guide](demo/README.md)
+
+**Try stock operations over HTTP.** With the local stack running, sign in as an administrator and run `./demo/api/catalog-stock.sh admin@example.test`. The script uses `jq` and creates fictional catalog data in the local application database. It demonstrates a receipt, a correction, and the recorded history. [Catalog and stock demo](demo/README.md#catalog-and-stock)
 
 ## Deploy on a server
 
@@ -134,14 +138,14 @@ cp -n .env.deploy.example .env.deploy
 
 Edit `.env.deploy` with these settings:
 
-| Setting | Value on your host |
-|---|---|
-| APP_IMAGE | Tag from step 1 or your published image digest |
-| DB_HOST, DB_PORT | PostgreSQL hostname matching its TLS certificate and its port, reachable from the container |
-| DB_NAME, DB_USER, FLYWAY_USER | Defaults match step 2 |
-| DB_CA_CERT_SOURCE | Host path to the database provider's trusted CA certificate in PEM format |
-| DB_PASSWORD_FILE, FLYWAY_PASSWORD_FILE | Host paths containing the application and migration role passwords from step 2 |
-| APP_PORT | Host loopback port for the reverse proxy, default 8080 |
+| Setting                                | Value on your host                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| APP_IMAGE                              | Tag from step 1 or your published image digest                                              |
+| DB_HOST, DB_PORT                       | PostgreSQL hostname matching its TLS certificate and its port, reachable from the container |
+| DB_NAME, DB_USER, FLYWAY_USER          | Defaults match step 2                                                                       |
+| DB_CA_CERT_SOURCE                      | Host path to the database provider's trusted CA certificate in PEM format                   |
+| DB_PASSWORD_FILE, FLYWAY_PASSWORD_FILE | Host paths containing the application and migration role passwords from step 2              |
+| APP_PORT                               | Host loopback port for the reverse proxy, default 8080                                      |
 
 Place the provider's CA at `secrets/db-ca.pem` when using the default paths. The following commands are for **Bash on a Linux host with rootful Docker**, on first setup. Enter the two database passwords from step 2. The files contain the exact password bytes without a trailing newline.
 
@@ -196,11 +200,11 @@ Use the email from step 4. A successful public check yields `UP` followed by you
 
 ## Troubleshooting
 
-| Symptom | What to check |
-|---|---|
-| Local startup reports a port already in use | Choose a free APP_PORT or DB_PORT in .env, then rerun make start-stack. For IDE development, stop the containerized app before running the JVM. |
+| Symptom                                                  | What to check                                                                                                                                                               |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local startup reports a port already in use              | Choose a free APP_PORT or DB_PORT in .env, then rerun make start-stack. For IDE development, stop the containerized app before running the JVM.                             |
 | PostgreSQL rejects the local password after editing .env | The database initializes credentials only on first volume creation. Restore the matching DB_PASSWORD or change the database role password through an authorized connection. |
-| Bootstrap says the users table must be empty | An account already exists, possibly from a fixture. Use the existing login or a separate fresh demo database. The bootstrap command cannot reset a password. |
-| Login returns 401 | Use an active employee email and its employee password. Curl prompts when given only the email. |
-| Request returns 403 | Check the employee's role and the allowed endpoint. Unsafe methods also require CSRF protection. |
-| Deployment fails readiness | Inspect app logs. Verify DB_HOST against the certificate, CA trust, database reachability, secret permissions, and both roles' credentials and schema grants. |
+| Bootstrap says the users table must be empty             | An account already exists, possibly from a fixture. Use the existing login or a separate fresh demo database. The bootstrap command cannot reset a password.                |
+| Login returns 401                                        | Use an active employee email and its employee password. Curl prompts when given only the email.                                                                             |
+| Request returns 403                                      | Check the employee's role and the allowed endpoint. Unsafe methods also require CSRF protection.                                                                            |
+| Deployment fails readiness                               | Inspect app logs. Verify DB_HOST against the certificate, CA trust, database reachability, secret permissions, and both roles' credentials and schema grants.               |

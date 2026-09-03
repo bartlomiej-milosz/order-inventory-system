@@ -5,12 +5,12 @@ response_file=$(mktemp)
 trap 'rm -f -- "$response_file"' EXIT
 
 request() {
-    local label=$1 path=$2 expected_status=$3 actual_status
-    shift 3
+    local method=$1 label=$2 path=$3 expected_status=$4 actual_status
+    shift 4
 
-    printf '\n%s\nGET %s\n' "$label" "$path"
+    printf '\n%s\n%s %s\n' "$label" "$method" "$path"
     actual_status=$(curl --disable --silent --show-error --max-time 15 \
-        --proto '=http,https' --output "$response_file" --write-out '%{http_code}' \
+        --proto '=http,https' --request "$method" --output "$response_file" --write-out '%{http_code}' \
         "$@" -- "$base_url$path") || return 1
     printf 'Expected HTTP %s, received HTTP %s\n' "$expected_status" "$actual_status"
     cat -- "$response_file"
