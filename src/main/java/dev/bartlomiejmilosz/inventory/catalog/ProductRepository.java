@@ -22,5 +22,5 @@ public interface ProductRepository extends Repository<Product, UUID> {
 
   @Lock(LockModeType.PESSIMISTIC_READ)
   @Query("select e from Product e where e.id = :id")
-  Optional<Product> findForStockOperation(UUID id);
+  Optional<Product> findWithSharedLock(UUID id);
 }

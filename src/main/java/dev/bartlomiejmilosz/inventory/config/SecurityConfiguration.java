@@ -79,6 +79,19 @@ class SecurityConfiguration {
                   "/api/v1/products/*",
                   "/api/v1/warehouses/*")
               .hasRole("ADMIN");
+          requests
+              .requestMatchers(
+                  HttpMethod.GET, "/api/v1/orders", "/api/v1/orders/*", "/api/v1/orders/*/items/*")
+              .hasAnyRole("ADMIN", "OPERATOR");
+          requests
+              .requestMatchers(HttpMethod.POST, "/api/v1/orders", "/api/v1/orders/*/items")
+              .hasAnyRole("ADMIN", "OPERATOR");
+          requests
+              .requestMatchers(HttpMethod.PUT, "/api/v1/orders/*", "/api/v1/orders/*/items/*")
+              .hasAnyRole("ADMIN", "OPERATOR");
+          requests
+              .requestMatchers(HttpMethod.DELETE, "/api/v1/orders/*/items/*")
+              .hasAnyRole("ADMIN", "OPERATOR");
           requests.anyRequest().denyAll();
         });
     return http.build();

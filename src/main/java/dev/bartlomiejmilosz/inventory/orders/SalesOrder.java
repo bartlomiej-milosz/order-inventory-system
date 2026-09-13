@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "sales_orders", schema = "inventory")
@@ -54,7 +55,13 @@ public class SalesOrder extends IdentifiedEntity {
     this.warehouse = warehouse;
     this.createdBy = createdBy;
     this.status = OrderStatus.DRAFT;
-    this.createdAt = Instant.now();
+    this.createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+  }
+
+  void updateHeader(Customer customer, Warehouse warehouse, String note) {
+    this.customer = customer;
+    this.warehouse = warehouse;
+    this.note = note;
   }
 
   public String getOrderNumber() {

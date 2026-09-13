@@ -115,9 +115,9 @@ class StockService {
     // Always acquire catalog locks in this order. A shared lock lets independent receipts
     // run concurrently but keeps a product or warehouse from being deactivated mid-operation.
     var product =
-        products.findForStockOperation(productId).orElseThrow(ResourceNotFoundException::new);
+        products.findWithSharedLock(productId).orElseThrow(ResourceNotFoundException::new);
     var warehouse =
-        warehouses.findForStockOperation(warehouseId).orElseThrow(ResourceNotFoundException::new);
+        warehouses.findWithSharedLock(warehouseId).orElseThrow(ResourceNotFoundException::new);
     if (!product.isActive() || !warehouse.isActive()) {
       throw new ResourceConflictException("The product and warehouse must both be active.");
     }

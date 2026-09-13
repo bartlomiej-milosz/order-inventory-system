@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 
-interface CustomerRepository extends Repository<Customer, UUID> {
+public interface CustomerRepository extends Repository<Customer, UUID> {
   Optional<Customer> findById(UUID id);
 
   Page<Customer> findAll(Pageable page);

@@ -44,6 +44,14 @@ public class OrderItem extends IdentifiedEntity {
     this.unitPrice = product.getUnitPrice();
   }
 
+  void changeQuantity(int quantity) {
+    this.quantity = quantity;
+  }
+
+  public BigDecimal getTotal() {
+    return unitPrice.multiply(BigDecimal.valueOf(quantity));
+  }
+
   public String getProductName() {
     return productName;
   }

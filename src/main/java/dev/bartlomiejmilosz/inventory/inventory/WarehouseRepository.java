@@ -22,5 +22,5 @@ public interface WarehouseRepository extends Repository<Warehouse, UUID> {
 
   @Lock(LockModeType.PESSIMISTIC_READ)
   @Query("select e from Warehouse e where e.id = :id")
-  Optional<Warehouse> findForStockOperation(UUID id);
+  Optional<Warehouse> findWithSharedLock(UUID id);
 }

@@ -170,7 +170,8 @@ class EmployeeSecurityTests {
 
   @Test
   void deniesUnlistedEndpointsEvenToAnAdministrator() throws Exception {
-    problem(get("/api/v1/orders", "admin@m3.test"), 403);
+    problem(
+        get("/api/v1/orders/00000000-0000-0000-0000-000000000000/fulfill", "admin@m3.test"), 403);
     problem(get("/actuator/env", "admin@m3.test"), 403);
   }
 

@@ -57,7 +57,58 @@ class LocalDocumentationTests {
           .isTrue();
       assertThat(paths.path(stock + "/movements").has("get")).isTrue();
       assertThat(paths.path(stock + "/movements").has("delete")).isFalse();
+      assertDraftOrderSchemas(spec);
     }
+  }
+
+  private void assertDraftOrderSchemas(JsonNode spec) {
+    var paths = spec.path("paths");
+    String order = "/api/v1/orders";
+    var collection = paths.path(order);
+    var create = collection.path("post");
+    assertFields(
+        properties(spec, requestSchema(create)),
+        "orderNumber",
+        "customerId",
+        "warehouseId",
+        "note");
+    var detail = properties(spec, responseSchema(create, "201"));
+    assertFields(detail, "order", "items");
+    assertFields(
+        properties(spec, detail.path("order")),
+        "id",
+        "orderNumber",
+        "createdBy",
+        "status",
+        "total");
+    var page = properties(spec, responseSchema(collection.path("get"), "200"));
+    assertFields(properties(spec, page.path("items").path("items")), "id", "status", "total");
+    var update = paths.path(order + "/{orderId}").path("put");
+    assertFields(properties(spec, requestSchema(update)), "customerId", "warehouseId", "note");
+    assertThat(properties(spec, requestSchema(update)).has("status")).isFalse();
+    assertThat(properties(spec, requestSchema(update)).has("orderNumber")).isFalse();
+    var add = paths.path(order + "/{orderId}/items").path("post");
+    assertFields(properties(spec, requestSchema(add)), "productId", "quantity");
+    assertFields(
+        properties(spec, responseSchema(add, "201")),
+        "productSku",
+        "productName",
+        "unitPrice",
+        "lineTotal");
+    var item = paths.path(order + "/{orderId}/items/{itemId}");
+    assertFields(properties(spec, requestSchema(item.path("put"))), "quantity");
+    assertThat(properties(spec, requestSchema(item.path("put"))).has("productId")).isFalse();
+    assertThat(item.path("delete").path("responses").has("204")).isTrue();
+  }
+
+  private static void assertFields(JsonNode properties, String... names) {
+    for (String name : names) {
+      assertThat(properties.has(name)).as("schema field %s", name).isTrue();
+    }
+  }
+
+  private static JsonNode requestSchema(JsonNode operation) {
+    return operation.path("requestBody").path("content").path("application/json").path("schema");
   }
 
   private void assertCatalogSchemas(JsonNode spec, String path, String field) {
