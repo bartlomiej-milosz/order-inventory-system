@@ -1,38 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 || -z $1 || $1 == *:* || $1 == *$'\n'* || $1 == *$'\r'* ]]; then
-    printf 'Usage: %s ADMIN_EMAIL\n' "$0" >&2
-    exit 2
-fi
-command -v jq >/dev/null || { printf 'Install jq to run this demo.\n' >&2; exit 2; }
-IFS= read -r -s -p 'Administrator password: ' password
-printf '\n' >&2
-
+demo_dir=$(dirname "${BASH_SOURCE[0]}")
 # shellcheck source=demo/api/common.sh
-source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
-work=$(mktemp -d)
-trap 'rm -f -- "$response_file"; rm -rf -- "$work"' EXIT
-# Use curl's config file so the password is absent from curl's command-line arguments.
-credentials=$1:$password
-credentials=${credentials//\\/\\\\}
-credentials=${credentials//\"/\\\"}
-(umask 077; printf 'user = "%s"\n' "$credentials" > "$work/curl.conf")
-unset password credentials
+source "$demo_dir/common.sh"
+# shellcheck source=demo/api/write-session.sh
+source "$demo_dir/write-session.sh"
+prepare_write_session "$@"
 
 api=/api/v1
-auth=(--config "$work/curl.conf")
-request GET 'Verify the signed-in employee' "$api/auth/me" 200 "${auth[@]}"
-jq -e '.role == "ADMIN"' "$response_file" >/dev/null || { printf 'Use an ADMIN account for this demo.\n' >&2; exit 1; }
-
-# Spring sends the token in the body and its matching cookie in the same response.
-curl --disable --silent --show-error --fail --max-time 15 --proto '=http,https' \
-    "${auth[@]}" --cookie-jar "$work/cookies" --output "$work/csrf.json" -- "$base_url$api/auth/csrf"
-csrf_header=$(jq -er .headerName "$work/csrf.json")
-csrf_token=$(jq -er .token "$work/csrf.json")
-write_auth=("${auth[@]}" --cookie "$work/cookies" --header "$csrf_header: $csrf_token"
-    --header 'Content-Type: application/json')
-
 suffix=$(openssl rand -hex 6 | tr '[:lower:]' '[:upper:]')
 request POST 'Create a sample customer' "$api/customers" 201 "${write_auth[@]}" \
     --data '{"name":"Demo Retail","email":"buyer@example.test"}'

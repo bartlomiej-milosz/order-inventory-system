@@ -45,6 +45,39 @@ List endpoints accept `page` from 0 to 1,000,000 and `size` from 1 to 100. The d
 
 For your own write requests, first call `GET /api/v1/auth/csrf` with Basic credentials. Keep the response cookie and send the JSON `token` in the header named by `headerName`, along with the cookie and Basic credentials. The demo script handles this sequence.
 
+### Draft orders
+
+With a local ADMIN account and `jq` installed, run:
+
+```sh
+./demo/api/draft-orders.sh admin@example.test
+```
+
+The demo creates fresh catalog records so it can run on an empty application database. It opens a draft, adds three widgets at 12.50 PLN each, rejects a duplicate line, and changes the catalog price. Increasing quantity to four keeps the original price, name and SKU. The script then adds and removes a second item, updates the header, and finds the draft using all three filters. The final total is 50.00 PLN and inventory stays unchanged. The sample records stay in the local application database.
+
+Authenticated ADMIN and OPERATOR users can use all draft order operations. The demo uses ADMIN to create and update the example catalog.
+
+| API path under `/api/v1` | Methods |
+|---|---|
+| `/orders` | `GET` lists orders with optional `status`, `customerId`, `warehouseId`, `page` and `size`. `POST` creates a draft with a unique order number (up to 30 characters), customer ID, warehouse ID and optional note (up to 500 characters). |
+| `/orders/{orderId}` | `GET` returns the header and items. `PUT` replaces the draft's customer, warehouse and note. |
+| `/orders/{orderId}/items` | `POST` adds a product and a positive whole number of units. |
+| `/orders/{orderId}/items/{itemId}` | `GET` reads the line. `PUT` changes quantity. `DELETE` removes a draft line. |
+
+List items contain the order summary. Detail responses contain that summary in `order` and a separate `items` array. Totals use saved item prices, so editing the catalog leaves existing drafts unchanged. An empty draft totals 0.00 PLN. Order numbers stay fixed after creation. A draft is edited through the paths above and confirmed through its own action. The existing Basic authentication and CSRF flow also apply to order writes.
+
+### Confirmation and reservations
+
+With the local application running, use an ADMIN account and `jq`:
+
+```sh
+./demo/api/confirm-orders.sh admin@example.test
+```
+
+The script creates fictional data in the local application database, receives ten units, and confirms a draft for six. A second draft requests five and receives `409` because only four are available. The draft stays editable, so the script changes it to four and confirms it. The result is ten units on hand, ten reserved, zero available and one physical movement for the original receipt. A repeated confirmation returns `409`.
+
+`POST /api/v1/orders/{orderId}/confirm` accepts no body and returns HTTP `200` with the order detail, `CONFIRMED` status and `confirmedAt`. ADMIN and OPERATOR can confirm. Send Basic credentials and the matching CSRF header and cookie for the write request. An empty draft, an inactive catalog record, missing stock, insufficient availability and an order that already left DRAFT all return `409`. The entire reservation succeeds or rolls back together.
+
 ## Local PostgreSQL
 
 With JDK 25 and Docker running, run `setup` once from the repository root after preparing `.env` using `make init-env`.
