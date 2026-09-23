@@ -3,23 +3,28 @@ package dev.bartlomiejmilosz.inventory.orders;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.bartlomiejmilosz.inventory.config.TestcontainersConfiguration;
+import jakarta.persistence.EntityManager;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +64,8 @@ class OrderDraftTests {
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper mapper;
   @Autowired PlatformTransactionManager transactionManager;
+  @Autowired OrderService orders;
+  @Autowired EntityManager entities;
   @LocalServerPort int port;
   private HttpClient client;
   private String passwordHash;
@@ -446,6 +453,331 @@ class OrderDraftTests {
     assertThat(body(get(location(line), OPERATOR_EMAIL)).path("quantity").asInt()).isEqualTo(1);
     assertThat(body(get(draft, OPERATOR_EMAIL)).path("order").path("status").asString())
         .isEqualTo("CONFIRMED");
+  }
+
+  @Nested
+  class Confirmation {
+    @BeforeEach
+    void startWithoutPreexistingReservations() {
+      jdbc.update("UPDATE inventory.stock_levels SET reserved=0");
+    }
+
+    @Test
+    void confirmsAllItemsInTheOrderWarehouseWithoutPhysicalMovements() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      var admin = csrf(ADMIN_EMAIL);
+      addStock(id(20), ANOTHER_PRODUCT, WAREHOUSE, 6);
+      addStock(id(21), PRODUCT, ANOTHER_WAREHOUSE, 70);
+      var originalMovements =
+          jdbc.queryForList("SELECT * FROM inventory.stock_movements ORDER BY id");
+      String previous = newOrder("PREVIOUS", CUSTOMER, WAREHOUSE, operator);
+      addLine(previous, PRODUCT, 3, operator);
+      expect(send("POST", previous + "/confirm", ADMIN_EMAIL, admin, null), 200);
+      String draft = newOrder("MULTI", CUSTOMER, WAREHOUSE, operator);
+      String firstLine = addLine(draft, PRODUCT, 4, operator);
+      addLine(draft, ANOTHER_PRODUCT, 2, operator);
+      var originalLines = body(get(draft, OPERATOR_EMAIL)).path("items");
+
+      var result = send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null);
+      expect(result, 200);
+      var confirmed = body(result).path("order");
+      assertThat(confirmed.path("status").asString()).isEqualTo("CONFIRMED");
+      Instant timestamp = Instant.parse(confirmed.path("confirmedAt").asString());
+      assertThat(timestamp)
+          .isEqualTo(
+              Instant.parse(
+                  body(get(draft, ADMIN_EMAIL)).path("order").path("confirmedAt").asString()));
+      assertThat(confirmed.path("createdBy").asString()).isEqualTo(OPERATOR.toString());
+      assertTotal(confirmed, "50.20");
+      assertThat(body(result).path("items")).isEqualTo(originalLines);
+
+      var levels =
+          jdbc.queryForList("SELECT on_hand, reserved FROM inventory.stock_levels ORDER BY id");
+      assertThat(levels)
+          .containsExactly(
+              Map.of("on_hand", 10, "reserved", 7),
+              Map.of("on_hand", 6, "reserved", 2),
+              Map.of("on_hand", 70, "reserved", 0));
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT count(*) FROM inventory.stock_levels WHERE warehouse_id=? AND updated_at=(SELECT confirmed_at FROM inventory.sales_orders WHERE id=?)",
+                  Long.class,
+                  WAREHOUSE,
+                  orderId(draft)))
+          .isEqualTo(2);
+      assertThat(jdbc.queryForList("SELECT * FROM inventory.stock_movements ORDER BY id"))
+          .isEqualTo(originalMovements);
+      assertThat(body(get(ORDERS + "?status=CONFIRMED", ADMIN_EMAIL)).path("totalElements").asInt())
+          .isEqualTo(2);
+      problem(send("PUT", firstLine, OPERATOR_EMAIL, operator, "{\"quantity\":9}"), 409);
+      problem(send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null), 409);
+      assertThat(
+              jdbc.queryForList("SELECT on_hand, reserved FROM inventory.stock_levels ORDER BY id"))
+          .isEqualTo(levels);
+    }
+
+    @Test
+    void rejectsInvalidConfirmationWithoutCreatingStockOrWritingTransitions() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      var admin = csrf(ADMIN_EMAIL);
+      String draft = newOrder("INVALID", CUSTOMER, WAREHOUSE, operator);
+      problem(send("POST", draft + "/confirm", null, operator, null), 401);
+      problem(send("POST", draft + "/confirm", DISABLED_EMAIL, operator, null), 401);
+      problem(send("POST", draft + "/confirm", OPERATOR_EMAIL, null, null), 403);
+      problem(
+          send(
+              "POST",
+              ORDERS + "/" + UUID.randomUUID() + "/confirm",
+              OPERATOR_EMAIL,
+              operator,
+              null),
+          404);
+      problem(send("POST", ORDERS + "/invalid/confirm", OPERATOR_EMAIL, operator, null), 400);
+      problem(send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null), 409);
+      assertDraft(draft);
+      addLine(draft, PRODUCT, 5, operator);
+      addLine(draft, ANOTHER_PRODUCT, 1, operator);
+      // Stock in a different warehouse cannot satisfy the missing second level.
+      addStock(id(20), ANOTHER_PRODUCT, ANOTHER_WAREHOUSE, 60);
+      var beforeMissing = stockRows();
+      problem(send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null), 409);
+      assertDraft(draft);
+      assertThat(stockRows()).isEqualTo(beforeMissing);
+      addStock(id(21), ANOTHER_PRODUCT, WAREHOUSE, 60);
+      var before = stockRows();
+      expect(
+          send(
+              "POST",
+              "/api/v1/products/" + ANOTHER_PRODUCT + "/deactivate",
+              ADMIN_EMAIL,
+              admin,
+              null),
+          204);
+      problem(send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null), 409);
+      jdbc.update("UPDATE inventory.products SET active=true WHERE id=?", ANOTHER_PRODUCT);
+      expect(
+          send("POST", "/api/v1/warehouses/" + WAREHOUSE + "/deactivate", ADMIN_EMAIL, admin, null),
+          204);
+      problem(send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null), 409);
+      assertDraft(draft);
+      assertThat(stockRows()).isEqualTo(before);
+      assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory.stock_movements", Long.class))
+          .isEqualTo(1);
+    }
+
+    @Test
+    void rechecksProductActivityAfterWaitingForDeactivation() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String draft = newOrder("DEACTIVATING", CUSTOMER, WAREHOUSE, operator);
+      addLine(draft, PRODUCT, 3, operator);
+      problem(
+          runWhileLocked(
+              () -> jdbc.update("UPDATE inventory.products SET active=false WHERE id=?", PRODUCT),
+              () -> send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null)),
+          409);
+      assertDraft(draft);
+      assertReserved(0);
+    }
+
+    @Test
+    void rollsBackWhenTheSecondLockedProductHasInsufficientStock() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      addStock(id(20), ANOTHER_PRODUCT, WAREHOUSE, 1);
+      String draft = newOrder("PARTIAL", CUSTOMER, WAREHOUSE, operator);
+      addLine(draft, PRODUCT, 5, operator);
+      addLine(draft, ANOTHER_PRODUCT, 2, operator);
+      var before = stockRows();
+      var response = send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null);
+      problem(response, 409);
+      assertThat(body(response).path("detail").asString()).contains("available stock");
+      assertDraft(draft);
+      assertThat(stockRows()).isEqualTo(before);
+    }
+
+    @Test
+    void rollsBackBothTheFlushedReservationsAndTheOrderTransition() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      addStock(id(20), ANOTHER_PRODUCT, WAREHOUSE, 4);
+      String draft = newOrder("ROLLBACK", CUSTOMER, WAREHOUSE, operator);
+      addLine(draft, PRODUCT, 5, operator);
+      addLine(draft, ANOTHER_PRODUCT, 2, operator);
+      var before = stockRows();
+      new TransactionTemplate(transactionManager)
+          .executeWithoutResult(state -> {
+            orders.confirm(orderId(draft));
+            entities.flush();
+            assertThat(
+                    jdbc.queryForObject(
+                        "SELECT status FROM inventory.sales_orders WHERE id=?",
+                        String.class,
+                        orderId(draft)))
+                .isEqualTo("CONFIRMED");
+            assertThat(
+                    jdbc.queryForList(
+                        "SELECT reserved FROM inventory.stock_levels ORDER BY id", Integer.class))
+                .containsExactly(5, 2);
+            state.setRollbackOnly();
+          });
+      assertDraft(draft);
+      assertThat(stockRows()).isEqualTo(before);
+    }
+
+    @Test
+    void onlyOneOrderCanReserveTheLastUnitsInTwoIndependentTransactions() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String first = newOrder("WINNER", CUSTOMER, WAREHOUSE, operator);
+      String second = newOrder("WAITER", CUSTOMER, WAREHOUSE, operator);
+      addLine(first, PRODUCT, 10, operator);
+      addLine(second, PRODUCT, 10, operator);
+      problem(
+          runWhileLocked(
+              () -> orders.confirm(orderId(first)),
+              () -> send("POST", second + "/confirm", OPERATOR_EMAIL, operator, null)),
+          409);
+      assertThat(body(get(first, OPERATOR_EMAIL)).path("order").path("status").asString())
+          .isEqualTo("CONFIRMED");
+      assertDraft(second);
+      assertReserved(10);
+    }
+
+    @Test
+    void confirmingTheSameOrderConcurrentlyReservesOnlyOnce() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String draft = newOrder("ONCE", CUSTOMER, WAREHOUSE, operator);
+      addLine(draft, PRODUCT, 4, operator);
+      problem(
+          runWhileLocked(
+              () -> orders.confirm(orderId(draft)),
+              () -> send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null)),
+          409);
+      assertReserved(4);
+    }
+
+    @Test
+    void editWaitingBehindConfirmationCannotChangeTheConfirmedLine() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String draft = newOrder("CONFIRM-FIRST", CUSTOMER, WAREHOUSE, operator);
+      String line = addLine(draft, PRODUCT, 3, operator);
+      problem(
+          runWhileLocked(
+              () -> orders.confirm(orderId(draft)),
+              () -> send("PUT", line, OPERATOR_EMAIL, operator, "{\"quantity\":5}")),
+          409);
+      assertThat(body(get(line, OPERATOR_EMAIL)).path("quantity").asInt()).isEqualTo(3);
+      assertReserved(3);
+    }
+
+    @Test
+    void confirmationWaitingBehindAnEditReservesTheUpdatedQuantity() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String draft = newOrder("EDIT-FIRST", CUSTOMER, WAREHOUSE, operator);
+      String line = addLine(draft, PRODUCT, 3, operator);
+      var confirmed =
+          runWhileLocked(
+              () ->
+                  orders.updateItem(
+                      orderId(draft), orderId(line), new OrderDto.UpdateDraftOrderItemRequest(5)),
+              () -> send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null));
+      expect(confirmed, 200);
+      assertThat(body(confirmed).path("items").get(0).path("quantity").asInt()).isEqualTo(5);
+      assertReserved(5);
+    }
+
+    @Test
+    void waitsForTheLowestStockIdBeforeLockingTheNextStockRow() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      // Product and stock IDs are deliberately in opposite order.
+      addStock(id(0), ANOTHER_PRODUCT, WAREHOUSE, 6);
+      String draft = newOrder("STOCK-LOCK-ORDER", CUSTOMER, WAREHOUSE, operator);
+      addLine(draft, PRODUCT, 1, operator);
+      addLine(draft, ANOTHER_PRODUCT, 2, operator);
+      var transaction = new TransactionTemplate(transactionManager);
+      try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+        var waiter =
+            transaction.execute(state -> {
+              int blocker = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+              jdbc.queryForObject(
+                  "SELECT id FROM inventory.stock_levels WHERE id=? FOR UPDATE", UUID.class, id(0));
+              var future =
+                  workers.submit(
+                      () -> send("POST", draft + "/confirm", OPERATOR_EMAIL, operator, null));
+              assertBlockedBy(blocker);
+              // If confirm had locked the higher ID earlier, NOWAIT would fail here.
+              jdbc.queryForObject(
+                  "SELECT id FROM inventory.stock_levels WHERE id=? FOR UPDATE NOWAIT",
+                  UUID.class,
+                  id(10));
+              return future;
+            });
+        expect(waiter.get(10, TimeUnit.SECONDS), 200);
+      }
+      assertThat(
+              jdbc.queryForList(
+                  "SELECT reserved FROM inventory.stock_levels ORDER BY id", Integer.class))
+          .containsExactly(2, 1);
+    }
+
+    private HttpResponse<String> runWhileLocked(
+        Runnable first, Callable<HttpResponse<String>> second) throws Exception {
+      var transaction = new TransactionTemplate(transactionManager);
+      try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+        var waiter =
+            transaction.execute(state -> {
+              int blocker = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+              first.run();
+              var future = workers.submit(second);
+              assertBlockedBy(blocker);
+              return future;
+            });
+        return waiter.get(10, TimeUnit.SECONDS);
+      }
+    }
+
+    private void addStock(UUID id, UUID product, UUID warehouse, int onHand) {
+      jdbc.update(
+          "INSERT INTO inventory.stock_levels(id,product_id,warehouse_id,on_hand,reserved,updated_at) VALUES (?,?,?,?,0,now())",
+          id,
+          product,
+          warehouse,
+          onHand);
+    }
+
+    private String addLine(String order, UUID product, int quantity, Csrf csrf) throws Exception {
+      var result = send("POST", order + "/items", OPERATOR_EMAIL, csrf, line(product, quantity));
+      expect(result, 201);
+      return location(result);
+    }
+
+    private List<Map<String, Object>> stockRows() {
+      return jdbc.queryForList("SELECT * FROM inventory.stock_levels ORDER BY id");
+    }
+
+    private void assertDraft(String draft) throws Exception {
+      var header = body(get(draft, OPERATOR_EMAIL)).path("order");
+      assertThat(header.path("status").asString()).isEqualTo("DRAFT");
+      assertThat(header.path("confirmedAt").isNull()).isTrue();
+    }
+
+    private void assertReserved(int expected) {
+      var stock =
+          jdbc.queryForMap(
+              "SELECT on_hand, reserved FROM inventory.stock_levels WHERE product_id=? AND warehouse_id=?",
+              PRODUCT,
+              WAREHOUSE);
+      assertThat(stock).containsEntry("on_hand", 10).containsEntry("reserved", expected);
+      assertThat(
+              jdbc.queryForObject(
+                  """
+                  SELECT coalesce(sum(i.quantity),0) FROM inventory.order_items i JOIN inventory.sales_orders o ON o.id=i.order_id
+                  WHERE o.status='CONFIRMED' AND i.product_id=? AND o.warehouse_id=?
+                  """,
+                  Integer.class,
+                  PRODUCT,
+                  WAREHOUSE))
+          .isEqualTo(expected);
+      assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory.stock_movements", Long.class))
+          .isEqualTo(1);
+    }
   }
 
   private void assertBlockedBy(int blocker) {

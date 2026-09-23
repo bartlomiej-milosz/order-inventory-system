@@ -64,6 +64,11 @@ public class SalesOrder extends IdentifiedEntity {
     this.note = note;
   }
 
+  void confirm(Instant timestamp) {
+    status = OrderStatus.CONFIRMED;
+    confirmedAt = timestamp;
+  }
+
   public String getOrderNumber() {
     return orderNumber;
   }

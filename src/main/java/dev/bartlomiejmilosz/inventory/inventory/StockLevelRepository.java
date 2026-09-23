@@ -1,6 +1,8 @@
 package dev.bartlomiejmilosz.inventory.inventory;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -30,4 +32,13 @@ interface StockLevelRepository extends Repository<StockLevel, UUID> {
   @Query(
       "select s from StockLevel s where s.warehouse.id = :warehouseId and s.product.id = :productId")
   Optional<StockLevel> findForUpdate(UUID warehouseId, UUID productId);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query(
+      """
+      select s from StockLevel s
+      where s.warehouse.id = :warehouseId and s.product.id in :productIds
+      order by s.id
+      """)
+  List<StockLevel> findAllForUpdateInIdOrder(UUID warehouseId, Collection<UUID> productIds);
 }

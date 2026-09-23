@@ -68,6 +68,11 @@ class OrderController {
     return orders.update(orderId, request);
   }
 
+  @PostMapping("/{orderId}/confirm")
+  OrderDetail confirm(@PathVariable UUID orderId) {
+    return orders.confirm(orderId);
+  }
+
   @GetMapping("/{orderId}/items/{itemId}")
   OrderItemView getItem(@PathVariable UUID orderId, @PathVariable UUID itemId) {
     return orders.getItem(orderId, itemId);

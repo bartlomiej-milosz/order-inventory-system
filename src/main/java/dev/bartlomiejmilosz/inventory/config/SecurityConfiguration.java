@@ -84,7 +84,11 @@ class SecurityConfiguration {
                   HttpMethod.GET, "/api/v1/orders", "/api/v1/orders/*", "/api/v1/orders/*/items/*")
               .hasAnyRole("ADMIN", "OPERATOR");
           requests
-              .requestMatchers(HttpMethod.POST, "/api/v1/orders", "/api/v1/orders/*/items")
+              .requestMatchers(
+                  HttpMethod.POST,
+                  "/api/v1/orders",
+                  "/api/v1/orders/*/items",
+                  "/api/v1/orders/*/confirm")
               .hasAnyRole("ADMIN", "OPERATOR");
           requests
               .requestMatchers(HttpMethod.PUT, "/api/v1/orders/*", "/api/v1/orders/*/items/*")

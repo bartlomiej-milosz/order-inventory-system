@@ -4,6 +4,7 @@ import dev.bartlomiejmilosz.inventory.catalog.Customer;
 import dev.bartlomiejmilosz.inventory.catalog.CustomerRepository;
 import dev.bartlomiejmilosz.inventory.catalog.Product;
 import dev.bartlomiejmilosz.inventory.catalog.ProductRepository;
+import dev.bartlomiejmilosz.inventory.inventory.StockReservationService;
 import dev.bartlomiejmilosz.inventory.inventory.Warehouse;
 import dev.bartlomiejmilosz.inventory.inventory.WarehouseRepository;
 import dev.bartlomiejmilosz.inventory.orders.OrderDto.AddDraftOrderItemRequest;
@@ -41,6 +42,7 @@ class OrderService {
   private final CustomerRepository customers;
   private final ProductRepository products;
   private final WarehouseRepository warehouses;
+  private final StockReservationService reservations;
   private final EntityManager entities;
 
   OrderService(
@@ -49,12 +51,14 @@ class OrderService {
       CustomerRepository customers,
       ProductRepository products,
       WarehouseRepository warehouses,
+      StockReservationService reservations,
       EntityManager entities) {
     this.orders = orders;
     this.items = items;
     this.customers = customers;
     this.products = products;
     this.warehouses = warehouses;
+    this.reservations = reservations;
     this.entities = entities;
   }
 
@@ -149,6 +153,26 @@ class OrderService {
   void removeItem(UUID orderId, UUID itemId) {
     lockDraft(orderId);
     items.delete(findItem(orderId, itemId));
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  OrderDetail confirm(UUID orderId) {
+    SalesOrder draft = lockDraft(orderId);
+    List<OrderItem> lines = items.findByOrderIdOrderById(orderId);
+    if (lines.isEmpty()) {
+      throw new ResourceConflictException("Add at least one item before confirming the order.");
+    }
+    var quantities =
+        lines.stream()
+            .collect(Collectors.toMap(item -> item.getProduct().getId(), OrderItem::getQuantity));
+
+    // Use the same product-before-warehouse lock order as draft edits and stock operations.
+    if (products.findActiveWithSharedLock(quantities.keySet()).size() != quantities.size()) {
+      throw new ResourceConflictException("All order products must be active.");
+    }
+    UUID warehouseId = requireActiveWarehouse(draft.getWarehouse().getId()).getId();
+    draft.confirm(reservations.reserve(warehouseId, quantities));
+    return detail(draft, lines);
   }
 
   private OrderDetail detail(SalesOrder order) {

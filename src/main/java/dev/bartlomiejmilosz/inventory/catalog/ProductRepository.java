@@ -1,6 +1,8 @@
 package dev.bartlomiejmilosz.inventory.catalog;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -23,4 +25,8 @@ public interface ProductRepository extends Repository<Product, UUID> {
   @Lock(LockModeType.PESSIMISTIC_READ)
   @Query("select e from Product e where e.id = :id")
   Optional<Product> findWithSharedLock(UUID id);
+
+  @Lock(LockModeType.PESSIMISTIC_READ)
+  @Query("select p from Product p where p.id in :ids and p.active = true order by p.id")
+  List<Product> findActiveWithSharedLock(Collection<UUID> ids);
 }
