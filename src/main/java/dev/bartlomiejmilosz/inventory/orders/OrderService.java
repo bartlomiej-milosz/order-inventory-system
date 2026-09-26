@@ -66,7 +66,7 @@ class OrderService {
   PageResponse<OrderSummary> list(
       OrderStatus status, UUID customerId, UUID warehouseId, int page, int size) {
     Specification<SalesOrder> filters =
-        (order, query, criteria) -> {
+        (order, _, criteria) -> {
           var matching = new ArrayList<Predicate>();
           if (status != null) {
             matching.add(criteria.equal(order.get("status"), status));
@@ -85,13 +85,10 @@ class OrderService {
     if (result.isEmpty()) {
       return PageResponse.from(result.map(order -> OrderSummary.from(order, ZERO_TOTAL)));
     }
-    var ids = result.map(SalesOrder::getId).getContent();
+    var ids = result.map(order -> order.getId()).getContent();
     Map<UUID, BigDecimal> totals =
         items.totalsForOrders(ids).stream()
-            .collect(
-                Collectors.toMap(
-                    OrderItemRepository.OrderTotal::getOrderId,
-                    OrderItemRepository.OrderTotal::getTotal));
+            .collect(Collectors.toMap(row -> row.getOrderId(), row -> row.getTotal()));
     return PageResponse.from(
         result.map(
             order -> OrderSummary.from(order, totals.getOrDefault(order.getId(), ZERO_TOTAL))));
@@ -164,7 +161,8 @@ class OrderService {
     }
     var quantities =
         lines.stream()
-            .collect(Collectors.toMap(item -> item.getProduct().getId(), OrderItem::getQuantity));
+            .collect(
+                Collectors.toMap(item -> item.getProduct().getId(), item -> item.getQuantity()));
 
     // Use the same product-before-warehouse lock order as draft edits and stock operations.
     if (products.findActiveWithSharedLock(quantities.keySet()).size() != quantities.size()) {
@@ -182,7 +180,9 @@ class OrderService {
   private static OrderDetail detail(SalesOrder order, List<OrderItem> items) {
     var lines = items.stream().map(OrderItemView::from).toList();
     BigDecimal total =
-        lines.stream().map(OrderItemView::lineTotal).reduce(ZERO_TOTAL, BigDecimal::add);
+        lines.stream()
+            .map(line -> line.lineTotal())
+            .reduce(ZERO_TOTAL, (sum, amount) -> sum.add(amount));
     return new OrderDetail(OrderSummary.from(order, total), lines);
   }
 
