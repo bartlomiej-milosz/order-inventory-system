@@ -1,8 +1,8 @@
 # Order & Inventory Management System
 
-A Java 25 / Spring Boot backend for employees managing B2B orders across warehouses. Each order belongs to one customer and one warehouse. In the order model, confirming three units reserves them, fulfilling the order records their physical issue, and cancelling a confirmed order releases them. If a warehouse holds ten units and three are reserved, seven are available.
+A Java 25 / Spring Boot backend for employees managing B2B orders across warehouses. Each order belongs to one customer and one warehouse. Confirming three units reserves them, fulfilling the order records their physical issue, and cancelling a confirmed order releases them. If a warehouse holds ten units and three are reserved, seven are available.
 
-**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in, customer, product and warehouse management, stock receipts and adjustments, movement history, draft orders with price snapshots, confirmation with transactional stock reservations, health checks, local Swagger UI, and demos for the API and SQL. Fulfillment and cancellation are planned. The SQL demo includes example orders in those states. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
+**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in, customer, product and warehouse management, stock receipts and adjustments, movement history, draft orders with price snapshots, transactional confirmation, fulfillment and cancellation, health checks, local Swagger UI, and demos for the API and SQL. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
 
 [Run locally](#run-locally) · [Create the first administrator](#initial-administrator-and-employee-access) · [Develop and test](#develop-and-test) · [Deploy on a server](#deploy-on-a-server) · [Troubleshooting](#troubleshooting)
 
@@ -81,7 +81,7 @@ Use `make stack-status` for service state and `make stack-logs` to follow logs. 
 make verify-build
 ```
 
-This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite covers migrations, constraints, rollback, entity mappings, employee access, CSRF, catalog operations, draft editing, confirmation, reservation rollback, OpenAPI, and PostgreSQL lock contention. Use `make format-java` to apply the formatter. CI also builds the container and starts the local Compose stack for a smoke test. [CI workflow](.github/workflows/ci.yaml)
+This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite covers migrations, constraints, rollback, entity mappings, employee access, CSRF, catalog operations, draft editing, confirmation, fulfillment, cancellation, OpenAPI, transactional rollback and PostgreSQL lock contention. Use `make format-java` to apply the formatter. CI also builds the container and starts the local Compose stack for a smoke test. [CI workflow](.github/workflows/ci.yaml)
 
 **Work with the schema.** Flyway manages the business tables in `inventory` and the migration history in `flyway_history`. Hibernate validates the mappings on startup. Add a new versioned migration for changes to an applied schema. Use `make validate-db-migrations` to check local migration history. The separate `make repair-db-migrations` command changes history metadata and should be used only after investigating and resolving a mismatch. It does not apply missing structural changes. [Migrations](src/main/resources/db/migration/) · [SQL reports](demo/sql/) · [Demo and test data](demo/sql/seed.sql)
 
@@ -101,6 +101,8 @@ Look for order DEMO-003 totaling 23.00 PLN and WIDGET availability of 7 in NORTH
 **Try draft orders over HTTP.** Run `./demo/api/draft-orders.sh admin@example.test` as ADMIN with `jq` installed. It creates a draft, shows how saved line prices survive catalog edits, and checks that inventory remains unchanged. [Draft order demo](demo/README.md#draft-orders)
 
 **Try confirmation and reservation over HTTP.** Run `./demo/api/confirm-orders.sh admin@example.test` as ADMIN with `jq` installed. The script shows two orders competing for available units and verifies that confirmation changes reservations while physical stock remains on hand. [Confirmation demo](demo/README.md#confirmation-and-reservations)
+
+**Try the full order lifecycle over HTTP.** Run `./demo/api/complete-orders.sh admin@example.test` as ADMIN with `jq` installed. It fulfills one confirmed order, cancels another and cancels a draft. The script checks the final stock and the outbound movement. [Fulfillment and cancellation demo](demo/README.md#fulfillment-and-cancellation)
 
 ## Deploy on a server
 

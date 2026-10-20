@@ -41,7 +41,7 @@ Enter the account password at the prompt. The script creates a fictional custome
 | `…/stock/{productId}/adjustments` | `POST` for ADMIN with a nonzero signed `quantityDelta` and a required `note`. Record a receipt first. |
 | `…/stock/{productId}/movements`, `…/movements/{movementId}` | `GET` for ADMIN/OPERATOR. Creation responses link to the recorded movement. |
 
-List endpoints accept `page` from 0 to 1,000,000 and `size` from 1 to 100. The defaults are page 0 and size 20. Warehouse codes and product SKUs use uppercase ASCII letters, digits, hyphens and underscores, starting with a letter or digit. Quantities are whole units and movement notes are limited to 500 characters. Stock changes need an active product and warehouse and must preserve `onHand >= reserved`.
+List endpoints accept `page` from 0 to 1,000,000 and `size` from 1 to 100. The defaults are page 0 and size 20. Warehouse codes and product SKUs use uppercase ASCII letters, digits, hyphens and underscores, starting with a letter or digit. Quantities are whole units and movement notes are limited to 500 characters. Receipts and adjustments need an active product and warehouse and must preserve `onHand >= reserved`.
 
 For your own write requests, first call `GET /api/v1/auth/csrf` with Basic credentials. Keep the response cookie and send the JSON `token` in the header named by `headerName`, along with the cookie and Basic credentials. The demo script handles this sequence.
 
@@ -77,6 +77,23 @@ With the local application running, use an ADMIN account and `jq`:
 The script creates fictional data in the local application database, receives ten units, and confirms a draft for six. A second draft requests five and receives `409` because only four are available. The draft stays editable, so the script changes it to four and confirms it. The result is ten units on hand, ten reserved, zero available and one physical movement for the original receipt. A repeated confirmation returns `409`.
 
 `POST /api/v1/orders/{orderId}/confirm` accepts no body and returns HTTP `200` with the order detail, `CONFIRMED` status and `confirmedAt`. ADMIN and OPERATOR can confirm. Send Basic credentials and the matching CSRF header and cookie for the write request. An empty draft, an inactive catalog record, missing stock, insufficient availability and an order that already left DRAFT all return `409`. The entire reservation succeeds or rolls back together.
+
+### Fulfillment and cancellation
+
+With the local application running, use an ADMIN account and `jq`:
+
+```sh
+./demo/api/complete-orders.sh admin@example.test
+```
+
+The script receives ten units and fulfills an order for three, leaving seven on hand and zero reserved. It then confirms and cancels an order for two to show those units becoming available again. Finally it cancels a draft for twenty units. The history ends with the original `IN +10` and one `OUT -3` tied to the fulfilled order.
+
+| API action | Allowed starting status | Successful result |
+|---|---|---|
+| `POST /api/v1/orders/{orderId}/fulfill` | `CONFIRMED` | Decrease both on-hand and reserved quantities. Record one `OUT` per line with the order and authenticated employee. Return `FULFILLED`. |
+| `POST /api/v1/orders/{orderId}/cancel` | `DRAFT` or `CONFIRMED` | Release any reservation from the confirmed order. Preserve physical stock and movement history. Return `CANCELLED`. |
+
+The actions accept no body and return HTTP `200` with order detail. ADMIN and OPERATOR use Basic authentication and CSRF as for confirmation. Both can finish an existing confirmed order even after a product or warehouse is deactivated. Repeated actions on terminal orders return `409`. Stock, status and any new movements commit together.
 
 ## Local PostgreSQL
 
