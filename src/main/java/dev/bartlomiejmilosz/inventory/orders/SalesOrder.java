@@ -69,6 +69,14 @@ public class SalesOrder extends IdentifiedEntity {
     confirmedAt = timestamp;
   }
 
+  void fulfill() {
+    status = OrderStatus.FULFILLED;
+  }
+
+  void cancel() {
+    status = OrderStatus.CANCELLED;
+  }
+
   public String getOrderNumber() {
     return orderNumber;
   }

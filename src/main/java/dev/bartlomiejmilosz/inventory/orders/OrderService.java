@@ -159,10 +159,7 @@ class OrderService {
     if (lines.isEmpty()) {
       throw new ResourceConflictException("Add at least one item before confirming the order.");
     }
-    var quantities =
-        lines.stream()
-            .collect(
-                Collectors.toMap(item -> item.getProduct().getId(), item -> item.getQuantity()));
+    var quantities = quantitiesByProduct(lines);
 
     // Use the same product-before-warehouse lock order as draft edits and stock operations.
     if (products.findActiveWithSharedLock(quantities.keySet()).size() != quantities.size()) {
@@ -171,6 +168,41 @@ class OrderService {
     UUID warehouseId = requireActiveWarehouse(draft.getWarehouse().getId()).getId();
     draft.confirm(reservations.reserve(warehouseId, quantities));
     return detail(draft, lines);
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  OrderDetail fulfill(UUID orderId, UUID employeeId) {
+    SalesOrder order = lockOrder(orderId);
+    if (order.getStatus() != OrderStatus.CONFIRMED) {
+      throw new ResourceConflictException("Only confirmed orders can be fulfilled.");
+    }
+
+    List<OrderItem> lines = items.findByOrderIdOrderById(orderId);
+    EmployeeUser employee = entities.getReference(EmployeeUser.class, employeeId);
+    reservations.issue(order, quantitiesByProduct(lines), employee);
+    order.fulfill();
+    return detail(order, lines);
+  }
+
+  @Transactional(isolation = Isolation.READ_COMMITTED)
+  OrderDetail cancel(UUID orderId) {
+    SalesOrder order = lockOrder(orderId);
+    OrderStatus status = order.getStatus();
+    if (status != OrderStatus.DRAFT && status != OrderStatus.CONFIRMED) {
+      throw new ResourceConflictException("Only draft or confirmed orders can be cancelled.");
+    }
+
+    List<OrderItem> lines = items.findByOrderIdOrderById(orderId);
+    if (status == OrderStatus.CONFIRMED) {
+      reservations.release(order.getWarehouse().getId(), quantitiesByProduct(lines));
+    }
+    order.cancel();
+    return detail(order, lines);
+  }
+
+  private static Map<UUID, Integer> quantitiesByProduct(List<OrderItem> lines) {
+    return lines.stream()
+        .collect(Collectors.toMap(item -> item.getProduct().getId(), item -> item.getQuantity()));
   }
 
   private OrderDetail detail(SalesOrder order) {
@@ -188,11 +220,15 @@ class OrderService {
 
   private SalesOrder lockDraft(UUID id) {
     // Confirm and every draft edit take the same lock before reading the status.
-    SalesOrder order = orders.findForUpdate(id).orElseThrow(ResourceNotFoundException::new);
+    SalesOrder order = lockOrder(id);
     if (order.getStatus() != OrderStatus.DRAFT) {
       throw new ResourceConflictException("Only draft orders can be edited or confirmed.");
     }
     return order;
+  }
+
+  private SalesOrder lockOrder(UUID id) {
+    return orders.findForUpdate(id).orElseThrow(ResourceNotFoundException::new);
   }
 
   private OrderItem findItem(UUID orderId, UUID itemId) {

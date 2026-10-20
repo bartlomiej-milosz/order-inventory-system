@@ -27,6 +27,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -338,7 +340,7 @@ class OrderDraftTests {
     problem(send("POST", items, OPERATOR_EMAIL, operator, line(PRODUCT, 1)), 409);
     problem(send("PUT", location(added), OPERATOR_EMAIL, operator, "{\"quantity\":-1}"), 400);
     problem(send("PUT", location(added), OPERATOR_EMAIL, operator, "{}"), 400);
-    problem(send("POST", draft + "/fulfill", OPERATOR_EMAIL, operator, null), 403);
+    problem(send("POST", draft + "/archive", OPERATOR_EMAIL, operator, null), 403);
     assertThat(body(get(draft, ADMIN_EMAIL)).path("items").size()).isEqualTo(1);
   }
 
@@ -733,25 +735,6 @@ class OrderDraftTests {
       }
     }
 
-    private void addStock(UUID id, UUID product, UUID warehouse, int onHand) {
-      jdbc.update(
-          "INSERT INTO inventory.stock_levels(id,product_id,warehouse_id,on_hand,reserved,updated_at) VALUES (?,?,?,?,0,now())",
-          id,
-          product,
-          warehouse,
-          onHand);
-    }
-
-    private String addLine(String order, UUID product, int quantity, Csrf csrf) throws Exception {
-      var result = send("POST", order + "/items", OPERATOR_EMAIL, csrf, line(product, quantity));
-      expect(result, 201);
-      return location(result);
-    }
-
-    private List<Map<String, Object>> stockRows() {
-      return jdbc.queryForList("SELECT * FROM inventory.stock_levels ORDER BY id");
-    }
-
     private void assertDraft(String draft) throws Exception {
       var header = body(get(draft, OPERATOR_EMAIL)).path("order");
       assertThat(header.path("status").asString()).isEqualTo("DRAFT");
@@ -780,18 +763,321 @@ class OrderDraftTests {
     }
   }
 
+  private void addStock(UUID id, UUID product, UUID warehouse, int onHand) {
+    jdbc.update(
+        "INSERT INTO inventory.stock_levels(id,product_id,warehouse_id,on_hand,reserved,updated_at) VALUES (?,?,?,?,0,now())",
+        id,
+        product,
+        warehouse,
+        onHand);
+  }
+
+  private String addLine(String order, UUID product, int quantity, Csrf csrf) throws Exception {
+    var result = send("POST", order + "/items", OPERATOR_EMAIL, csrf, line(product, quantity));
+    expect(result, 201);
+    return location(result);
+  }
+
+  private List<Map<String, Object>> stockRows() {
+    return jdbc.queryForList("SELECT * FROM inventory.stock_levels ORDER BY id");
+  }
+
+  @Nested
+  class Completion {
+    private static final String STOCK = "/api/v1/warehouses/" + WAREHOUSE + "/stock/";
+    private static final UUID SECOND_STOCK = id(12);
+
+    @BeforeEach
+    void initializeStock() {
+      // Start with physical receipts only. Each reservation is made through confirm.
+      jdbc.update("UPDATE inventory.stock_levels SET reserved=0");
+      addStock(SECOND_STOCK, ANOTHER_PRODUCT, WAREHOUSE, 5);
+      jdbc.update(
+          "INSERT INTO inventory.stock_movements (id,stock_level_id,performed_by,type,quantity_delta) VALUES (?,?,?,'IN',5)",
+          id(13),
+          SECOND_STOCK,
+          ADMIN);
+    }
+
+    @Test
+    void fulfillsEveryLineAndRecordsTheActorAfterCatalogDeactivation() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      var admin = csrf(ADMIN_EMAIL);
+      String other = newOrder("M7-KEEP", CUSTOMER, WAREHOUSE, operator);
+      addLine(other, PRODUCT, 2, operator);
+      expect(send("POST", other + "/confirm", OPERATOR_EMAIL, operator, null), 200);
+      String order = confirmedOrder("M7-FULFILL", operator);
+      var previous = body(get(order, ADMIN_EMAIL));
+      deactivateCatalog(admin);
+
+      var result = send("POST", order + "/fulfill", ADMIN_EMAIL, admin, null);
+      expect(result, 200);
+      assertCompletion(result, previous, "FULFILLED");
+      assertStock(PRODUCT, 7, 2);
+      assertStock(ANOTHER_PRODUCT, 3, 0);
+      assertOutbound(order, PRODUCT, 3, ADMIN);
+      assertOutbound(order, ANOTHER_PRODUCT, 2, ADMIN);
+      assertThat(movementsFor(order)).isEqualTo(2);
+      assertStockReconciles();
+      assertTerminalActionsRejected(order, admin);
+    }
+
+    @Test
+    void cancelsConfirmedAndDraftOrdersWhileKeepingHistoryAndPhysicalStock() throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      var admin = csrf(ADMIN_EMAIL);
+      String confirmed = confirmedOrder("M7-CANCEL-CONFIRMED", operator);
+      String draft = newOrder("M7-CANCEL-DRAFT", CUSTOMER, WAREHOUSE, operator);
+      addLine(draft, PRODUCT, 20, operator);
+      var beforeConfirmed = body(get(confirmed, OPERATOR_EMAIL));
+      var beforeDraft = body(get(draft, OPERATOR_EMAIL));
+      deactivateCatalog(admin);
+
+      var stockBeforeDraftCancel = stockRows();
+      var draftResult = send("POST", draft + "/cancel", OPERATOR_EMAIL, operator, null);
+      expect(draftResult, 200);
+      assertCompletion(draftResult, beforeDraft, "CANCELLED");
+      assertThat(body(draftResult).path("order").path("confirmedAt").isNull()).isTrue();
+      assertThat(stockRows()).isEqualTo(stockBeforeDraftCancel);
+
+      var confirmedResult = send("POST", confirmed + "/cancel", OPERATOR_EMAIL, operator, null);
+      expect(confirmedResult, 200);
+      assertCompletion(confirmedResult, beforeConfirmed, "CANCELLED");
+      assertStock(PRODUCT, 10, 0);
+      assertStock(ANOTHER_PRODUCT, 5, 0);
+      assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory.stock_movements", Long.class))
+          .isEqualTo(2);
+      assertStockReconciles();
+      assertTerminalActionsRejected(confirmed, admin);
+      assertTerminalActionsRejected(draft, admin);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"fulfill", "cancel"})
+    void requiresAnActiveEmployeeAndCsrfAndValidOrderId(String action) throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String draft = newOrder("M7-PROTECTED", CUSTOMER, WAREHOUSE, operator);
+      problem(send("POST", draft + "/" + action, null, operator, null), 401);
+      problem(send("POST", draft + "/" + action, DISABLED_EMAIL, operator, null), 401);
+      problem(send("POST", draft + "/" + action, OPERATOR_EMAIL, null, null), 403);
+      problem(send("POST", ORDERS + "/invalid/" + action, OPERATOR_EMAIL, operator, null), 400);
+      problem(
+          send(
+              "POST",
+              ORDERS + "/" + UUID.randomUUID() + "/" + action,
+              OPERATOR_EMAIL,
+              operator,
+              null),
+          404);
+      problem(send("POST", draft + "/fulfill", OPERATOR_EMAIL, operator, null), 409);
+      assertThat(body(get(draft, OPERATOR_EMAIL)).path("order").path("status").asString())
+          .isEqualTo("DRAFT");
+      assertStockReconciles();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"fulfill", "cancel"})
+    void rollsBackWhenALaterStockRowCannotReleaseItsReservation(String action) throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String order = confirmedOrder("M7-BROKEN", operator);
+      var before = body(get(order, OPERATOR_EMAIL));
+      jdbc.update("UPDATE inventory.stock_levels SET reserved=0 WHERE id=?", SECOND_STOCK);
+      var stockBefore = stockRows();
+      problem(send("POST", order + "/" + action, OPERATOR_EMAIL, operator, null), 409);
+      assertThat(body(get(order, OPERATOR_EMAIL))).isEqualTo(before);
+      assertThat(stockRows()).isEqualTo(stockBefore);
+      assertThat(movementsFor(order)).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"fulfill", "cancel"})
+    void rollsBackFlushedStatusStockAndLedgerInOneTransaction(String action) throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      String order = confirmedOrder("M7-ROLLBACK", operator);
+      var stockBefore = stockRows();
+      var tx = new TransactionTemplate(transactionManager);
+      tx.executeWithoutResult(state -> {
+        boolean fulfill = action.equals("fulfill");
+        if (fulfill) {
+          orders.fulfill(orderId(order), OPERATOR);
+        } else {
+          orders.cancel(orderId(order));
+        }
+        entities.flush();
+        assertThat(status(order)).isEqualTo(fulfill ? "FULFILLED" : "CANCELLED");
+        assertThat(movementsFor(order)).isEqualTo(fulfill ? 2 : 0);
+        assertThat(
+                jdbc.queryForList(
+                    "SELECT reserved FROM inventory.stock_levels ORDER BY id", Integer.class))
+            .containsExactly(0, 0);
+        assertThat(
+                jdbc.queryForList(
+                    "SELECT on_hand FROM inventory.stock_levels ORDER BY id", Integer.class))
+            .containsExactly(fulfill ? 7 : 10, fulfill ? 3 : 5);
+        state.setRollbackOnly();
+      });
+
+      assertThat(status(order)).isEqualTo("CONFIRMED");
+      assertThat(stockRows()).isEqualTo(stockBefore);
+      assertThat(movementsFor(order)).isZero();
+      assertStockReconciles();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"fulfill", "cancel"})
+    void onlyOneOfTwoConcurrentHttpActionsWins(String firstAction) throws Exception {
+      var operator = csrf(OPERATOR_EMAIL);
+      var admin = csrf(ADMIN_EMAIL);
+      String order = confirmedOrder("M7-RACE", operator);
+      boolean fulfillFirst = firstAction.equals("fulfill");
+      String secondAction = fulfillFirst ? "cancel" : "fulfill";
+      var gate = new TransactionTemplate(transactionManager);
+      try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+        var replies =
+            gate.execute(state -> {
+              int gatePid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+              jdbc.queryForObject(
+                  "SELECT id FROM inventory.stock_levels WHERE id=? FOR UPDATE",
+                  UUID.class,
+                  id(10));
+
+              var first =
+                  workers.submit(() ->
+                      send("POST", order + "/" + firstAction, OPERATOR_EMAIL, operator, null));
+              int firstPid = awaitWaiterOf(gatePid);
+              // The first request must wait for the lower stock ID before locking the higher one.
+              jdbc.queryForObject(
+                  "SELECT id FROM inventory.stock_levels WHERE id=? FOR UPDATE NOWAIT",
+                  UUID.class,
+                  SECOND_STOCK);
+              var second =
+                  workers.submit(
+                      () -> send("POST", order + "/" + secondAction, ADMIN_EMAIL, admin, null));
+              awaitWaiterOf(firstPid);
+              return List.of(first, second);
+            });
+        expect(replies.get(0).get(10, TimeUnit.SECONDS), 200);
+        problem(replies.get(1).get(10, TimeUnit.SECONDS), 409);
+      }
+
+      assertThat(status(order)).isEqualTo(fulfillFirst ? "FULFILLED" : "CANCELLED");
+      assertStock(PRODUCT, fulfillFirst ? 7 : 10, 0);
+      assertStock(ANOTHER_PRODUCT, fulfillFirst ? 3 : 5, 0);
+      assertThat(movementsFor(order)).isEqualTo(fulfillFirst ? 2 : 0);
+      if (fulfillFirst) {
+        assertOutbound(order, PRODUCT, 3, OPERATOR);
+        assertOutbound(order, ANOTHER_PRODUCT, 2, OPERATOR);
+      }
+      assertStockReconciles();
+    }
+
+    private String confirmedOrder(String number, Csrf operator) throws Exception {
+      String order = newOrder(number, CUSTOMER, WAREHOUSE, operator);
+      addLine(order, PRODUCT, 3, operator);
+      addLine(order, ANOTHER_PRODUCT, 2, operator);
+      expect(send("POST", order + "/confirm", OPERATOR_EMAIL, operator, null), 200);
+      return order;
+    }
+
+    private void deactivateCatalog(Csrf admin) throws Exception {
+      for (String path :
+          List.of(
+              "/products/" + PRODUCT, "/products/" + ANOTHER_PRODUCT, "/warehouses/" + WAREHOUSE)) {
+        expect(send("POST", "/api/v1" + path + "/deactivate", ADMIN_EMAIL, admin, null), 204);
+      }
+    }
+
+    private void assertCompletion(HttpResponse<String> result, JsonNode before, String status) {
+      var detail = body(result);
+      assertThat(detail.path("items")).isEqualTo(before.path("items"));
+      var header = detail.path("order");
+      assertThat(header.path("status").asString()).isEqualTo(status);
+      for (String field : List.of("confirmedAt", "createdAt", "createdBy", "total")) {
+        assertThat(header.path(field)).isEqualTo(before.path("order").path(field));
+      }
+    }
+
+    private void assertTerminalActionsRejected(String order, Csrf admin) throws Exception {
+      var stockBefore = stockRows();
+      var detail = body(get(order, ADMIN_EMAIL));
+      long movementsBefore = movementsFor(order);
+      for (String action : List.of("confirm", "fulfill", "cancel")) {
+        problem(send("POST", order + "/" + action, ADMIN_EMAIL, admin, null), 409);
+      }
+      problem(send("POST", order + "/items", ADMIN_EMAIL, admin, line(PRODUCT, 1)), 409);
+      assertThat(body(get(order, ADMIN_EMAIL))).isEqualTo(detail);
+      assertThat(stockRows()).isEqualTo(stockBefore);
+      assertThat(movementsFor(order)).isEqualTo(movementsBefore);
+    }
+
+    private String status(String order) {
+      return jdbc.queryForObject(
+          "SELECT status FROM inventory.sales_orders WHERE id=?", String.class, orderId(order));
+    }
+
+    private long movementsFor(String order) {
+      return jdbc.queryForObject(
+          "SELECT count(*) FROM inventory.stock_movements WHERE order_id=?",
+          Long.class,
+          orderId(order));
+    }
+
+    private void assertStock(UUID product, int onHand, int reserved) throws Exception {
+      var response = get(STOCK + product, OPERATOR_EMAIL);
+      expect(response, 200);
+      var stock = body(response);
+      assertThat(stock.path("onHand").asInt()).isEqualTo(onHand);
+      assertThat(stock.path("reserved").asInt()).isEqualTo(reserved);
+      assertThat(stock.path("available").asInt()).isEqualTo(onHand - reserved);
+    }
+
+    private void assertOutbound(String order, UUID product, int quantity, UUID employee)
+        throws Exception {
+      var response = get(STOCK + product + "/movements", ADMIN_EMAIL);
+      expect(response, 200);
+      assertThat(body(response).path("totalElements").asInt()).isEqualTo(2);
+      var movements = body(response).path("items");
+      var outbound = movements.get(0);
+      assertThat(outbound.path("type").asString()).isEqualTo("OUT");
+      assertThat(outbound.path("orderId").asString()).isEqualTo(orderId(order).toString());
+      assertThat(outbound.path("performedBy").asString()).isEqualTo(employee.toString());
+      assertThat(outbound.path("quantityDelta").asInt()).isEqualTo(-quantity);
+      assertThat(movements.get(1).path("type").asString()).isEqualTo("IN");
+    }
+
+    private void assertStockReconciles() {
+      assertThat(
+              jdbc.queryForList(
+                  """
+                  SELECT s.id FROM inventory.stock_levels s
+                  WHERE s.on_hand <> (SELECT coalesce(sum(m.quantity_delta), 0)
+                                      FROM inventory.stock_movements m WHERE m.stock_level_id=s.id)
+                     OR s.reserved <> (SELECT coalesce(sum(i.quantity), 0) FROM inventory.order_items i
+                                       JOIN inventory.sales_orders o ON o.id=i.order_id
+                                       WHERE o.status='CONFIRMED' AND o.warehouse_id=s.warehouse_id
+                                         AND i.product_id=s.product_id)
+                  """))
+          .isEmpty();
+    }
+  }
+
   private void assertBlockedBy(int blocker) {
+    awaitWaiterOf(blocker);
+  }
+
+  private int awaitWaiterOf(int blocker) {
     long cutoff = System.nanoTime() + Duration.ofSeconds(5).toNanos();
     while (System.nanoTime() < cutoff) {
-      if (Boolean.TRUE.equals(
-          jdbc.queryForObject(
+      var waiters =
+          jdbc.queryForList(
               """
-              SELECT EXISTS(SELECT 1 FROM pg_stat_activity
-              WHERE datname=current_database() AND ? = ANY(pg_blocking_pids(pid)))
+              SELECT pid FROM pg_stat_activity
+              WHERE datname=current_database() AND ? = ANY(pg_blocking_pids(pid))
               """,
-              Boolean.class,
-              blocker))) {
-        return;
+              Integer.class,
+              blocker);
+      if (!waiters.isEmpty()) {
+        return waiters.getFirst();
       }
       try {
         Thread.sleep(20);

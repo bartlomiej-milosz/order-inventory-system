@@ -73,6 +73,17 @@ class OrderController {
     return orders.confirm(orderId);
   }
 
+  @PostMapping("/{orderId}/fulfill")
+  OrderDetail fulfill(
+      @PathVariable UUID orderId, @AuthenticationPrincipal EmployeePrincipal employee) {
+    return orders.fulfill(orderId, employee.getId());
+  }
+
+  @PostMapping("/{orderId}/cancel")
+  OrderDetail cancel(@PathVariable UUID orderId) {
+    return orders.cancel(orderId);
+  }
+
   @GetMapping("/{orderId}/items/{itemId}")
   OrderItemView getItem(@PathVariable UUID orderId, @PathVariable UUID itemId) {
     return orders.getItem(orderId, itemId);

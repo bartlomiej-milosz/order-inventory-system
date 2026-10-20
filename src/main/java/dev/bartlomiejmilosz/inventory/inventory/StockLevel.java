@@ -60,6 +60,19 @@ public class StockLevel extends IdentifiedEntity {
     updatedAt = timestamp;
   }
 
+  void release(int quantity, Instant timestamp) {
+    if (quantity <= 0 || quantity > reserved) {
+      throw new ResourceConflictException("There is not enough reserved stock for this order.");
+    }
+    reserved -= quantity;
+    updatedAt = timestamp;
+  }
+
+  void issueReserved(int quantity, Instant timestamp) {
+    release(quantity, timestamp);
+    onHand -= quantity;
+  }
+
   public int getAvailable() {
     return onHand - reserved;
   }

@@ -58,9 +58,11 @@ class LocalDocumentationTests {
       assertThat(paths.path(stock + "/movements").has("get")).isTrue();
       assertThat(paths.path(stock + "/movements").has("delete")).isFalse();
       assertDraftOrderSchemas(spec);
-      var confirm = paths.path("/api/v1/orders/{orderId}/confirm").path("post");
-      assertFields(properties(spec, responseSchema(confirm, "200")), "order", "items");
-      assertThat(confirm.has("requestBody")).isFalse();
+      for (String action : new String[] {"confirm", "fulfill", "cancel"}) {
+        var operation = paths.path("/api/v1/orders/{orderId}/" + action).path("post");
+        assertFields(properties(spec, responseSchema(operation, "200")), "order", "items");
+        assertThat(operation.has("requestBody")).isFalse();
+      }
     }
   }
 
