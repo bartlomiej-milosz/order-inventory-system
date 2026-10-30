@@ -65,6 +65,8 @@ class SecurityConfiguration {
           requests
               .requestMatchers(
                   HttpMethod.POST,
+                  "/api/v1/users",
+                  "/api/v1/users/*/deactivate",
                   "/api/v1/customers",
                   "/api/v1/products",
                   "/api/v1/products/*/deactivate",
@@ -75,6 +77,7 @@ class SecurityConfiguration {
           requests
               .requestMatchers(
                   HttpMethod.PUT,
+                  "/api/v1/users/*/role",
                   "/api/v1/customers/*",
                   "/api/v1/products/*",
                   "/api/v1/warehouses/*")

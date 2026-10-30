@@ -12,6 +12,9 @@ spring:
   jackson:
     deserialization:
       accept-float-as-int: false
+    datatype:
+      enum:
+        fail-on-numbers-for-enums: true
   sql:
     init:
       mode: never

@@ -1,10 +1,6 @@
 package dev.bartlomiejmilosz.inventory.users;
 
 import jakarta.validation.Validator;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,14 +27,13 @@ public class AdminBootstrapService {
 
   @Transactional
   public UUID createFirstAdmin(String email, String password) {
-    String normalized = EmailAddress.normalize(email);
-    if (!validator.validate(new BootstrapEmail(normalized)).isEmpty()) {
+    var input = new EmployeeAccountInput(email, password, EmployeeRole.ADMIN);
+    if (!validator.validateProperty(input, "email").isEmpty()) {
       throw new IllegalArgumentException("A valid bootstrap email address is required.");
     }
-    int bytes = password.getBytes(StandardCharsets.UTF_8).length;
-    if (password.codePointCount(0, password.length()) < 14 || bytes > 72) {
+    if (!EmployeeAccountInput.validPassword(password)) {
       throw new IllegalArgumentException(
-          "The bootstrap password must have at least 14 characters and at most 72 UTF-8 bytes.");
+          "The bootstrap password must have at least 14 characters and at most 72 UTF-8 bytes, without control characters.");
     }
     // Provisioning is rare: serialize the empty-table check with all account writes.
     jdbc.execute("LOCK TABLE inventory.users IN EXCLUSIVE MODE");
@@ -46,9 +41,7 @@ public class AdminBootstrapService {
       throw new IllegalStateException("Bootstrap requires an empty users table.");
     }
     return users
-        .save(new EmployeeUser(normalized, passwords.encode(password), EmployeeRole.ADMIN))
+        .save(new EmployeeUser(input.email(), passwords.encode(password), EmployeeRole.ADMIN))
         .getId();
   }
-
-  private record BootstrapEmail(@NotBlank @Email(regexp = "[^:]+") @Size(max = 254) String email) {}
 }

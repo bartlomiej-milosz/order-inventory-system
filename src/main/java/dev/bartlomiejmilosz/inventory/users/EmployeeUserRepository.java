@@ -11,5 +11,7 @@ public interface EmployeeUserRepository extends Repository<EmployeeUser, UUID> {
 
   long count();
 
+  long countByRoleAndActiveTrue(EmployeeRole role);
+
   EmployeeUser save(EmployeeUser user);
 }

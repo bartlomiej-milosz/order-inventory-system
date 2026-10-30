@@ -37,6 +37,14 @@ public class EmployeeUser extends IdentifiedEntity {
     this.createdAt = Instant.now();
   }
 
+  void changeRole(EmployeeRole role) {
+    this.role = role;
+  }
+
+  void deactivate() {
+    this.active = false;
+  }
+
   public String getEmail() {
     return email;
   }
