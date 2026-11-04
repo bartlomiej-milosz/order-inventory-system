@@ -57,6 +57,31 @@ class LocalDocumentationTests {
           .isTrue();
       assertThat(paths.path(stock + "/movements").has("get")).isTrue();
       assertThat(paths.path(stock + "/movements").has("delete")).isFalse();
+      var createEmployee = paths.path("/api/v1/users").path("post");
+      var employeeInput = properties(spec, requestSchema(createEmployee));
+      assertFields(employeeInput, "email", "password", "role");
+      assertThat(employeeInput.path("password").path("writeOnly").asBoolean()).isTrue();
+      var employee = properties(spec, responseSchema(createEmployee, "201"));
+      assertFields(employee, "id", "role", "active", "createdAt");
+      assertThat(employee.has("password") || employee.has("passwordHash")).isFalse();
+      var changeRole = paths.path("/api/v1/users/{id}/role").path("put");
+      assertFields(properties(spec, requestSchema(changeRole)), "role");
+      assertThat(
+              paths.path("/api/v1/users/{id}/deactivate").path("post").path("responses").has("204"))
+          .isTrue();
+      for (String probe : new String[] {"/livez", "/readyz", "/swagger-ui.html"}) {
+        var publicResponse =
+            client.send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + probe)).build(),
+                HttpResponse.BodyHandlers.ofString());
+        if (probe.equals("/swagger-ui.html")) {
+          assertThat(publicResponse.statusCode()).isBetween(300, 399);
+        } else {
+          assertThat(publicResponse.statusCode()).isEqualTo(200);
+          assertThat(mapper.readTree(publicResponse.body()).path("status").asString())
+              .isEqualTo("UP");
+        }
+      }
       assertDraftOrderSchemas(spec);
       for (String action : new String[] {"confirm", "fulfill", "cancel"}) {
         var operation = paths.path("/api/v1/orders/{orderId}/" + action).path("post");

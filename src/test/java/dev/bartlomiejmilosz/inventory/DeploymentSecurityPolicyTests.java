@@ -55,6 +55,15 @@ class DeploymentSecurityPolicyTests {
         "policy@m3.test",
         passwords.encode(password));
     try (var client = HttpClient.newHttpClient()) {
+      for (String probe : new String[] {"/livez", "/readyz"}) {
+        var probeRequest =
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + probe)).build();
+        var publicProbe = client.send(probeRequest, HttpResponse.BodyHandlers.ofString());
+        assertThat(publicProbe.statusCode()).isEqualTo(200);
+        assertThat(publicProbe.body())
+            .contains("\"status\":\"UP\"")
+            .doesNotContain("components", "details");
+      }
       for (String path : new String[] {"/v3/api-docs", "/swagger-ui.html"}) {
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path));
         assertThat(client.send(request.build(), HttpResponse.BodyHandlers.ofString()).statusCode())

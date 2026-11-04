@@ -11,7 +11,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,6 +28,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
@@ -29,8 +37,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -42,6 +52,11 @@ class EmployeeSecurityTests {
   private static final String PASSWORD = "Inventory-test-password-42!";
   private static final UUID ADMIN = UUID.fromString("10000000-0000-0000-0000-000000000001");
   private static final UUID OPERATOR = UUID.fromString("10000000-0000-0000-0000-000000000002");
+
+  @Autowired
+  @Qualifier("requestMappingHandlerMapping")
+  RequestMappingHandlerMapping routes;
+
   @Autowired JdbcTemplate jdbc;
   @Autowired PasswordEncoder passwords;
   @Autowired ObjectMapper mapper;
@@ -52,7 +67,7 @@ class EmployeeSecurityTests {
 
   @BeforeAll
   void prepareHash() {
-    hash = passwords.encode(PASSWORD);
+    hash = "{bcrypt}" + new BCryptPasswordEncoder(4).encode(PASSWORD);
     client = HttpClient.newHttpClient();
   }
 
@@ -116,6 +131,243 @@ class EmployeeSecurityTests {
     assertThat(body(response).get("detail").asString()).isNotBlank();
     assertThat(response.body())
         .doesNotContain(PASSWORD, hash, "passwordHash", "stackTrace", "SELECT ");
+  }
+
+  private static final String USERS = "/api/v1/users";
+  private static final String ADMIN_EMAIL = "admin@m3.test";
+  private static final String OPERATOR_EMAIL = "operator@m3.test";
+
+  private record Csrf(String cookie, String header, String token) {}
+
+  private Csrf csrf(String email) throws Exception {
+    var response = get("/api/v1/auth/csrf", email);
+    assertThat(response.statusCode()).isEqualTo(200);
+    return new Csrf(
+        response.headers().firstValue("Set-Cookie").orElseThrow().split(";", 2)[0],
+        body(response).get("headerName").asString(),
+        body(response).get("token").asString());
+  }
+
+  private HttpResponse<String> call(
+      String method, String path, String email, Csrf csrf, String json) throws Exception {
+    var builder = request(path, email, PASSWORD);
+    if (csrf != null) {
+      builder.header("Cookie", csrf.cookie()).header(csrf.header(), csrf.token());
+    }
+    if (json != null) {
+      builder.header("Content-Type", "application/json");
+    }
+    return send(
+        builder.method(
+            method,
+            json == null
+                ? HttpRequest.BodyPublishers.noBody()
+                : HttpRequest.BodyPublishers.ofString(json)));
+  }
+
+  private String account(String email, String password, String role) {
+    return mapper.writeValueAsString(Map.of("email", email, "password", password, "role", role));
+  }
+
+  @Test
+  void managesEmployeeAccessThroughTheApi() throws Exception {
+    var token = csrf(ADMIN_EMAIL);
+    String email = "new@m3.test";
+    String input = account(" NEW@M3.TEST ", PASSWORD, "OPERATOR");
+    problem(call("POST", USERS, ADMIN_EMAIL, null, input), 403);
+    var created = call("POST", USERS, ADMIN_EMAIL, token, input);
+    assertThat(created.statusCode()).isEqualTo(201);
+    var view = body(created);
+    String path = USERS + "/" + view.path("id").asString();
+    assertThat(created.headers().firstValue("Location")).contains(path);
+    assertThat(view.path("email").asString()).isEqualTo(email);
+    assertThat(view.path("role").asString()).isEqualTo("OPERATOR");
+    assertThat(view.path("active").asBoolean()).isTrue();
+    assertThat(created.body()).doesNotContain("password", PASSWORD, "{bcrypt}");
+    String stored =
+        jdbc.queryForObject(
+            "SELECT password_hash FROM inventory.users WHERE email=?", String.class, email);
+    assertThat(stored).startsWith("{bcrypt}");
+    assertThat(passwords.matches(PASSWORD, stored)).isTrue();
+    assertThat(get("/api/v1/auth/me", email).statusCode()).isEqualTo(200);
+    problem(get(path, email), 403);
+    problem(call("POST", USERS, ADMIN_EMAIL, token, input), 409);
+
+    var promoted = call("PUT", path + "/role", ADMIN_EMAIL, token, "{\"role\":\"ADMIN\"}");
+    assertThat(promoted.statusCode()).isEqualTo(200);
+    assertThat(body(promoted).path("role").asString()).isEqualTo("ADMIN");
+    assertThat(get(path, email).statusCode()).isEqualTo(200);
+    assertThat(
+            call("PUT", path + "/role", ADMIN_EMAIL, token, "{\"role\":\"OPERATOR\"}").statusCode())
+        .isEqualTo(200);
+    problem(get(path, email), 403);
+    for (int i = 0; i < 2; i++) {
+      assertThat(call("POST", path + "/deactivate", ADMIN_EMAIL, token, null).statusCode())
+          .isEqualTo(204);
+    }
+    problem(get("/api/v1/auth/me", email), 401);
+    assertThat(body(get(path, ADMIN_EMAIL)).path("active").asBoolean()).isFalse();
+    problem(call("POST", USERS, ADMIN_EMAIL, token, input), 409);
+  }
+
+  @Test
+  void validatesAccountInputAndPreservesTheLastAdministrator() throws Exception {
+    var token = csrf(ADMIN_EMAIL);
+    for (String input :
+        List.of(
+            "{}",
+            account("invalid", PASSWORD, "ADMIN"),
+            account("\"a:b\"@m3.test", PASSWORD, "ADMIN"),
+            account("new@m3.test", "short", "ADMIN"),
+            account("new@m3.test", "ą".repeat(37), "ADMIN"),
+            account("new@m3.test", "😀".repeat(10), "ADMIN"),
+            account("new@m3.test", PASSWORD, "OWNER"),
+            account("new@m3.test", PASSWORD, "ADMIN").replace("\"ADMIN\"", "0"))) {
+      problem(call("POST", USERS, ADMIN_EMAIL, token, input), 400);
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM inventory.users WHERE email='new@m3.test'", Integer.class))
+        .isZero();
+    problem(call("PUT", USERS + "/" + ADMIN + "/role", ADMIN_EMAIL, token, "{}"), 400);
+    problem(
+        call("PUT", USERS + "/" + ADMIN + "/role", ADMIN_EMAIL, token, "{\"role\":\"OPERATOR\"}"),
+        409);
+    problem(call("POST", USERS + "/" + ADMIN + "/deactivate", ADMIN_EMAIL, token, null), 409);
+    assertThat(get(USERS + "/" + ADMIN, ADMIN_EMAIL).statusCode()).isEqualTo(200);
+  }
+
+  @Test
+  void concurrentDemotionAndDeactivationKeepOneActiveAdministrator() throws Exception {
+    jdbc.update("UPDATE inventory.users SET role='ADMIN' WHERE id=?", OPERATOR);
+    var firstToken = csrf(ADMIN_EMAIL);
+    var secondToken = csrf(OPERATOR_EMAIL);
+    var start = new CountDownLatch(1);
+    try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+      var demotion =
+          executor.submit(() -> {
+            start.await();
+            return call(
+                    "PUT",
+                    USERS + "/" + ADMIN + "/role",
+                    ADMIN_EMAIL,
+                    firstToken,
+                    "{\"role\":\"OPERATOR\"}")
+                .statusCode();
+          });
+      var deactivation =
+          executor.submit(() -> {
+            start.await();
+            return call(
+                    "POST",
+                    USERS + "/" + OPERATOR + "/deactivate",
+                    OPERATOR_EMAIL,
+                    secondToken,
+                    null)
+                .statusCode();
+          });
+      start.countDown();
+      assertThat(
+              List.of(demotion.get(10, TimeUnit.SECONDS), deactivation.get(10, TimeUnit.SECONDS)))
+          .isIn(List.of(200, 409), List.of(409, 204));
+    }
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM inventory.users WHERE role='ADMIN' AND active",
+                Integer.class))
+        .isOne();
+  }
+
+  @Test
+  void checksEveryBusinessEndpointForAllFourCallers() throws Exception {
+    // Deliberately use missing IDs and invalid write bodies to test successful authorization
+    // without changing the fixture. Domain workflow tests cover successful payloads.
+    var expected = new HashMap<String, Integer>();
+    var adminOnly = new HashSet<String>();
+    for (String catalog : List.of("customers", "products", "warehouses")) {
+      String path = "/" + catalog;
+      expected.put("GET " + path, 200);
+      expected.put("GET " + path + "/{id}", 404);
+      expected.put("POST " + path, 400);
+      expected.put("PUT " + path + "/{id}", 400);
+      adminOnly.add("POST " + path);
+      adminOnly.add("PUT " + path + "/{id}");
+    }
+    for (String path :
+        List.of(
+            "/products/{id}/deactivate", "/warehouses/{id}/deactivate", "/users/{id}/deactivate")) {
+      expected.put("POST " + path, 404);
+      adminOnly.add("POST " + path);
+    }
+    String stock = "/warehouses/{warehouseId}/stock";
+    String pair = stock + "/{productId}";
+    String movement = pair + "/movements";
+    for (String path : List.of(stock, pair, movement, movement + "/{movementId}")) {
+      expected.put("GET " + path, 404);
+    }
+    expected.put("POST " + pair + "/receipts", 400);
+    expected.put("POST " + pair + "/adjustments", 400);
+    adminOnly.add("POST " + pair + "/adjustments");
+    expected.put("GET /auth/me", 200);
+    expected.put("GET /auth/csrf", 200);
+    expected.put("GET /users/{id}", 404);
+    expected.put("POST /users", 400);
+    expected.put("PUT /users/{id}/role", 400);
+    adminOnly.addAll(List.of("GET /users/{id}", "POST /users", "PUT /users/{id}/role"));
+    expected.put("GET /orders", 200);
+    expected.put("POST /orders", 400);
+    String order = "/orders/{orderId}";
+    expected.put("GET " + order, 404);
+    expected.put("PUT " + order, 400);
+    for (String action : List.of("confirm", "fulfill", "cancel")) {
+      expected.put("POST " + order + "/" + action, 404);
+    }
+    expected.put("POST " + order + "/items", 400);
+    String item = order + "/items/{itemId}";
+    expected.put("GET " + item, 404);
+    expected.put("PUT " + item, 400);
+    expected.put("DELETE " + item, 404);
+
+    var mapped = new HashSet<String>();
+    routes
+        .getHandlerMethods()
+        .keySet()
+        .forEach(mapping -> {
+          for (String path : mapping.getPatternValues()) {
+            if (path.startsWith("/api/v1/")) {
+              mapping
+                  .getMethodsCondition()
+                  .getMethods()
+                  .forEach(method ->
+                      mapped.add(method.name() + " " + path.substring("/api/v1".length())));
+            }
+          }
+        });
+    assertThat(expected.keySet()).containsExactlyInAnyOrderElementsOf(mapped);
+    var token = csrf(ADMIN_EMAIL);
+    UUID missing = UUID.randomUUID();
+    for (var entry : expected.entrySet()) {
+      String[] route = entry.getKey().split(" ", 2);
+      String path = "/api/v1" + route[1].replaceAll("\\{[^}]+}", missing.toString());
+      boolean reads = route[0].equals("GET");
+      String payload = entry.getValue() == 400 ? "{}" : null;
+      for (String email : new String[] {ADMIN_EMAIL, OPERATOR_EMAIL, null, "disabled@m3.test"}) {
+        var result = call(route[0], path, email, reads ? null : token, payload);
+        int status =
+            email == null || email.startsWith("disabled@")
+                ? 401
+                : email.equals(OPERATOR_EMAIL) && adminOnly.contains(entry.getKey())
+                    ? 403
+                    : entry.getValue();
+        assertThat(result.statusCode()).as("%s %s", email, entry.getKey()).isEqualTo(status);
+        if (status >= 400) {
+          problem(result, status);
+        }
+      }
+      if (!reads) {
+        problem(call(route[0], path, ADMIN_EMAIL, null, payload), 403);
+      }
+    }
   }
 
   @Test
@@ -214,7 +466,7 @@ class EmployeeSecurityTests {
                 .header("Cookie", cookiePair)
                 .header(header, token)
                 .POST(HttpRequest.BodyPublishers.noBody()));
-    // The token passes CSRF; the unimplemented write endpoint is still denied.
+    // The token passes CSRF; this unsupported method is still denied.
     problem(valid, 403);
     assertThat(body(valid).get("detail").asString()).isEqualTo("Access denied.");
   }
