@@ -2,7 +2,7 @@
 
 A Java 25 / Spring Boot backend for employees managing B2B orders across warehouses. Each order belongs to one customer and one warehouse. Confirming three units reserves them, fulfilling the order records their physical issue, and cancelling a confirmed order releases them. If a warehouse holds ten units and three are reserved, seven are available.
 
-**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in, customer, product and warehouse management, stock receipts and adjustments, movement history, draft orders with price snapshots, transactional confirmation, fulfillment and cancellation, health checks, local Swagger UI, and demos for the API and SQL. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
+**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in and account administration, customer, product and warehouse management, stock receipts and adjustments, movement history, draft orders with price snapshots, transactional confirmation, fulfillment and cancellation, health checks, local Swagger UI, and demos for the API and SQL. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
 
 [Run locally](#run-locally) · [Create the first administrator](#initial-administrator-and-employee-access) · [Develop and test](#develop-and-test) · [Deploy on a server](#deploy-on-a-server) · [Troubleshooting](#troubleshooting)
 
@@ -59,11 +59,25 @@ For another port, prefix a demo command with `BASE_URL=http://127.0.0.1:8081`. T
 | GET /livez and GET /readyz | Public            | Process health and readiness, including database connectivity for readiness |
 | GET /api/v1/auth/me        | ADMIN or OPERATOR | Your employee ID, normalized email and current role                         |
 | GET /api/v1/users/{id}     | ADMIN             | Employee details, including whether the account is active                   |
+| POST /api/v1/users | ADMIN | Create an active employee account and return its ID |
+| PUT /api/v1/users/{id}/role | ADMIN | Assign ADMIN or OPERATOR |
+| POST /api/v1/users/{id}/deactivate | ADMIN | Disable sign-in and retain the employee's history |
 | GET /api/v1/auth/csrf      | ADMIN or OPERATOR | CSRF cookie and a response containing the header name and masked token      |
 
 For customers, products, warehouses and stock movements, see the [catalog and stock endpoint table](demo/README.md#catalog-and-stock).
 
 HTTP Basic authenticates each request. Changes to an account's role or active flag take effect on its next request. CSRF protection on unsafe methods requires both the cookie and the token in the named header. Swagger and the OpenAPI JSON at `/v3/api-docs` are available locally. Other application routes default to denied.
+
+### 4. Add an employee and check their login
+
+From the repository root, use Bash and `jq`. Replace both emails with your own. The script prompts for the administrator password and then for the new employee password twice.
+
+```sh
+./demo/api/employee-accounts.sh admin@example.test create operator@example.test OPERATOR
+curl --user operator@example.test http://127.0.0.1:8080/api/v1/auth/me
+```
+
+Use the new password at the curl prompt. Expect `"role":"OPERATOR"`. Save the employee ID from the creation response for later changes. An operator can receive stock and process orders. An administrator can also manage the catalog, adjust stock and manage employees. To run the account commands against a deployed instance, set `BASE_URL` to its public HTTPS URL. [Role changes, deactivation and API responses](demo/README.md#employee-accounts)
 
 ### Stop and resume
 

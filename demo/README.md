@@ -20,6 +20,28 @@ BASE_URL=http://127.0.0.1:8081 ./demo/api/health.sh
 
 Use HTTPS for authenticated requests outside local development. The password is entered at the `curl` prompt.
 
+### Employee accounts
+
+Use an active ADMIN and `jq`. These commands change the selected database. For a local walkthrough, replace the example emails, create an operator and copy the returned ID into `EMPLOYEE_ID`. The second and third commands promote and then deactivate that employee.
+
+```sh
+./demo/api/employee-accounts.sh admin@example.test create operator@example.test OPERATOR
+EMPLOYEE_ID='<id from the creation response>'
+./demo/api/employee-accounts.sh admin@example.test role "$EMPLOYEE_ID" ADMIN
+./demo/api/employee-accounts.sh admin@example.test deactivate "$EMPLOYEE_ID"
+```
+
+| Request under `/api/v1` | JSON request | Success |
+| --- | --- | --- |
+| `POST /users` | `email`, `password`, `role` | `201`, public employee fields and a `Location` header |
+| `GET /users/{id}` | — | `200`, ID, email, role, active flag and creation time |
+| `PUT /users/{id}/role` | `{"role":"OPERATOR"}` or `{"role":"ADMIN"}` | `200`, updated employee |
+| `POST /users/{id}/deactivate` | — | `204`, empty response |
+
+All four endpoints require ADMIN. Writes use the Basic credentials, masked CSRF token and matching cookie described below. Email addresses are trimmed and lowercased. Enter a password of at least 14 Unicode characters and at most 72 UTF-8 bytes, without control characters. Passwords are write-only. Role changes apply on the employee's next request. Deactivation keeps historical references and the email stays in use. Repeating deactivation returns `204`.
+
+Validation errors return `400`, invalid or disabled credentials return `401`, and insufficient permissions or a missing CSRF token on a write return `403`. An unknown employee ID returns `404`. A duplicate email or an attempt to demote or deactivate the last active ADMIN returns `409`. To hand over administration, create or promote another ADMIN first.
+
 ### Catalog and stock
 
 With the local stack running and an ADMIN account provisioned, run the following from the repository root. The script also needs `jq` and OpenSSL.
