@@ -6,6 +6,22 @@ A Java 25 / Spring Boot backend for employees managing B2B orders across warehou
 
 [Run locally](#run-locally) · [Create the first administrator](#initial-administrator-and-employee-access) · [Develop and test](#develop-and-test) · [Deploy on a server](#deploy-on-a-server) · [Troubleshooting](#troubleshooting)
 
+## Model and transaction boundaries
+
+One Spring Boot application serves the HTTP API and writes to PostgreSQL. Controllers validate request DTOs, services implement business rules inside transactions, and Spring Data repositories issue the reads and locks. Flyway owns the database schema. The eight business tables cover employees, customers, products, warehouses, stock per product and warehouse, order headers, order lines, and physical movements.
+
+| Action in one warehouse | On hand | Reserved | Available | Physical movement |
+| --- | ---: | ---: | ---: | --- |
+| Receive 10 units | 10 | 0 | 10 | IN +10 |
+| Create a draft for 3 units | 10 | 0 | 10 | — |
+| Confirm the draft | 10 | 3 | 7 | — |
+| Fulfill the confirmed order | 7 | 0 | 7 | OUT −3 |
+| Alternatively, cancel immediately after confirmation | 10 | 0 | 10 | — |
+
+Each order uses one warehouse and is processed in full. Lines retain the product name, SKU and price from the time the employee added them. Prices are in PLN and quantities are whole units. Payments, returns and transfers between warehouses are outside this release.
+
+Order edits and transitions lock the order header before checking its status. Confirmation checks active catalog entries and locks all required stock rows by ID. A shortage on any line rolls back the entire confirmation. The stock counter and the sum of confirmed lines can be compared independently with the SQL reports. [Order service](src/main/java/dev/bartlomiejmilosz/inventory/orders/OrderService.java) · [Reconciliation queries](demo/sql/consistency.sql)
+
 ## Run locally
 
 Use a macOS or Linux terminal with Git, Bash, Make, OpenSSL, curl and Docker with the Compose v2 plugin. Start the Docker engine. The full-stack path builds Java inside Docker. A host JDK is needed only to run Maven or develop in an IDE.
@@ -95,7 +111,7 @@ Use `make stack-status` for service state and `make stack-logs` to follow logs. 
 make verify-build
 ```
 
-This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite covers migrations, constraints, rollback, entity mappings, employee access, CSRF, catalog operations, draft editing, confirmation, fulfillment, cancellation, OpenAPI, transactional rollback and PostgreSQL lock contention. Use `make format-java` to apply the formatter. CI also builds the container and starts the local Compose stack for a smoke test. [CI workflow](.github/workflows/ci.yaml)
+This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite covers migrations, constraints, rollback, entity mappings, employee access, CSRF, catalog operations, draft editing, confirmation, fulfillment, cancellation, OpenAPI, transactional rollback and PostgreSQL lock contention. Use `make format-java` to apply the formatter. CI also builds the container, bootstraps a disposable administrator and runs the order lifecycle in Compose. It checks the SQL balances and observes both health probes during a database outage and after recovery. [CI workflow](.github/workflows/ci.yaml)
 
 **Work with the schema.** Flyway manages the business tables in `inventory` and the migration history in `flyway_history`. Hibernate validates the mappings on startup. Add a new versioned migration for changes to an applied schema. Use `make validate-db-migrations` to check local migration history. The separate `make repair-db-migrations` command changes history metadata and should be used only after investigating and resolving a mismatch. It does not apply missing structural changes. [Migrations](src/main/resources/db/migration/) · [SQL reports](demo/sql/) · [Demo and test data](demo/sql/seed.sql)
 
