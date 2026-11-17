@@ -1,0 +1,12 @@
+spring:
+  config:
+    import: "optional:configtree:/run/secrets/"
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}?sslmode=verify-full&sslrootcert=${DB_CA_CERT_FILE}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  flyway:
+    url: ${spring.datasource.url}
+    user: ${FLYWAY_USER}
+    password: ${FLYWAY_PASSWORD}
+    create-schemas: false

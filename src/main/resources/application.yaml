@@ -1,3 +1,51 @@
 spring:
   application:
     name: order-inventory-system
+  autoconfigure:
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      "[hibernate.default_schema]": inventory
+  sql:
+    init:
+      mode: never
+  flyway:
+    locations: classpath:db/migration
+    default-schema: flyway_history
+    schemas: flyway_history,inventory
+    validate-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: true
+
+server:
+  shutdown: graceful
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    access:
+      default: none
+    web:
+      discovery:
+        enabled: false
+      exposure:
+        include: health
+  endpoint:
+    health:
+      access: read-only
+      show-details: never
+      show-components: never
+      probes:
+        enabled: true
+        add-additional-paths: true
+      group:
+        readiness:
+          include: readinessState,db
