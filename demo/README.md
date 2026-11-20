@@ -1,142 +1,80 @@
-# Project demo
+# API walkthroughs and SQL reports
 
-## HTTP API
+Run these commands from the repository root with Python 3.9 or later. All Python imports come from the standard library. The HTTP commands call a running application. The SQL commands use Docker Compose, PostgreSQL's own tools and the project's Flyway migrations.
 
-Run the scripts from the repository root with Bash and `curl`. Use the running stack from the [local setup](../README.md#run-locally), or start the application with `make run-local` in another terminal. To show authenticated access, use an active employee account. On a fresh local database, follow the [initial administrator setup](../README.md#initial-administrator-and-employee-access).
+## Start here
 
-```sh
-./demo/api/health.sh
-./demo/api/employee-access.sh admin@example.test
-```
-
-1. `health.sh` shows that `GET /livez` and `GET /readyz` return HTTP 200 and report `UP`.
-2. `employee-access.sh` shows HTTP 401 for an anonymous `GET /api/v1/auth/me`. Then `curl` prompts for the employee's password, and the same request returns HTTP 200 with the employee's ID, email and role. Pass the account email used during setup.
-
-The scripts show each response and exit with an error if it differs from the expected status or health result. They default to `http://127.0.0.1:8080`. Set `BASE_URL` for a different port, for example:
+Follow the [local setup](../README.md#run-locally) to start the stack and create the first ADMIN. Substitute that account's email below. The client prompts for passwords, prints request paths, status codes and key results and exits with a nonzero status if a response or business result differs from the scenario.
 
 ```sh
-BASE_URL=http://127.0.0.1:8081 ./demo/api/health.sh
+python3 -m demo health
+python3 -m demo employee-access admin@example.test
+python3 -m demo complete-orders admin@example.test
 ```
 
-Use HTTPS for authenticated requests outside local development. The password is entered at the `curl` prompt.
+The expected results are two healthy probes, a `401` followed by your signed-in profile, and a completed sale with **7 units on hand, 0 reserved and two physical movements**. Use `python3 -m demo --help` to list commands. To inspect JSON bodies, add `--verbose` before the command, for example `python3 -m demo --verbose health`. The default API address is `http://127.0.0.1:8080`. For another local port use, for example, `BASE_URL=http://127.0.0.1:8081 python3 -m demo health`. Use HTTPS for employee credentials outside local development.
 
-### Employee accounts
+## Order and stock scenarios
 
-Use an active ADMIN and `jq`. These commands change the selected database. For a local walkthrough, replace the example emails, create an operator and copy the returned ID into `EMPLOYEE_ID`. The second and third commands promote and then deactivate that employee.
-
-```sh
-./demo/api/employee-accounts.sh admin@example.test create operator@example.test OPERATOR
-EMPLOYEE_ID='<id from the creation response>'
-./demo/api/employee-accounts.sh admin@example.test role "$EMPLOYEE_ID" ADMIN
-./demo/api/employee-accounts.sh admin@example.test deactivate "$EMPLOYEE_ID"
-```
-
-| Request under `/api/v1` | JSON request | Success |
-| --- | --- | --- |
-| `POST /users` | `email`, `password`, `role` | `201`, public employee fields and a `Location` header |
-| `GET /users/{id}` | — | `200`, ID, email, role, active flag and creation time |
-| `PUT /users/{id}/role` | `{"role":"OPERATOR"}` or `{"role":"ADMIN"}` | `200`, updated employee |
-| `POST /users/{id}/deactivate` | — | `204`, empty response |
-
-All four endpoints require ADMIN. Writes use the Basic credentials, masked CSRF token and matching cookie described below. Email addresses are trimmed and lowercased. Enter a password of at least 14 Unicode characters and at most 72 UTF-8 bytes, without control characters. Passwords are write-only. Role changes apply on the employee's next request. Deactivation keeps historical references and the email stays in use. Repeating deactivation returns `204`.
-
-Validation errors return `400`, invalid or disabled credentials return `401`, and insufficient permissions or a missing CSRF token on a write return `403`. An unknown employee ID returns `404`. A duplicate email or an attempt to demote or deactivate the last active ADMIN returns `409`. To hand over administration, create or promote another ADMIN first.
+Run each command independently. All four use ADMIN to create their sample catalog. Each run generates fresh catalog codes and order numbers and leaves its fictional records in the application database for inspection. Use a development installation.
 
 ### Catalog and stock
 
-With the local stack running and an ADMIN account provisioned, run the following from the repository root. The script also needs `jq` and OpenSSL.
+`python3 -m demo catalog-stock admin@example.test`
 
-```sh
-./demo/api/catalog-stock.sh admin@example.test
-```
-
-Enter the account password at the prompt. The script creates a fictional customer, a product and a warehouse with a fresh SKU and code on each run. It reads zero stock, records a 10-unit receipt and a correction of −2, then shows a rejected correction and the two persisted movements. The final physical and available stock are both 8. Run it against a local development database. The demo records stay in that database for inspection.
-
-| API path under `/api/v1` | Methods and roles |
-|---|---|
-| `/customers`, `/products`, `/warehouses` | `GET` for ADMIN/OPERATOR. `POST` for ADMIN. |
-| `/customers/{id}`, `/products/{id}`, `/warehouses/{id}` | `GET` for ADMIN/OPERATOR. `PUT` for ADMIN. |
-| `/products/{id}/deactivate`, `/warehouses/{id}/deactivate` | `POST` for ADMIN. Existing stock and history stay readable. |
-| `/warehouses/{warehouseId}/stock` | `GET` for ADMIN/OPERATOR. Lists recorded levels. |
-| `/warehouses/{warehouseId}/stock/{productId}` | `GET` for ADMIN/OPERATOR. An existing catalog pair without a stock row returns zero quantities. |
-| `…/stock/{productId}/receipts` | `POST` for ADMIN/OPERATOR with `quantity` and an optional `note`. |
-| `…/stock/{productId}/adjustments` | `POST` for ADMIN with a nonzero signed `quantityDelta` and a required `note`. Record a receipt first. |
-| `…/stock/{productId}/movements`, `…/movements/{movementId}` | `GET` for ADMIN/OPERATOR. Creation responses link to the recorded movement. |
-
-List endpoints accept `page` from 0 to 1,000,000 and `size` from 1 to 100. The defaults are page 0 and size 20. Warehouse codes and product SKUs use uppercase ASCII letters, digits, hyphens and underscores, starting with a letter or digit. Quantities are whole units and movement notes are limited to 500 characters. Receipts and adjustments need an active product and warehouse and must preserve `onHand >= reserved`.
-
-For your own write requests, first call `GET /api/v1/auth/csrf` with Basic credentials. Keep the response cookie and send the JSON `token` in the header named by `headerName`, along with the cookie and Basic credentials. The demo script handles this sequence.
+Read a new product's zero stock, receive 10 units and correct two damaged units. A further correction of −9 returns `409`. The two persisted movements explain the final balance of 8.
 
 ### Draft orders
 
-With a local ADMIN account and `jq` installed, run:
+`python3 -m demo draft-orders admin@example.test`
 
-```sh
-./demo/api/draft-orders.sh admin@example.test
-```
-
-The demo creates fresh catalog records so it can run on an empty application database. It opens a draft, adds three widgets at 12.50 PLN each, rejects a duplicate line, and changes the catalog price. Increasing quantity to four keeps the original price, name and SKU. The script then adds and removes a second item, updates the header, and finds the draft using all three filters. The final total is 50.00 PLN and inventory stays unchanged. The sample records stay in the local application database.
-
-Authenticated ADMIN and OPERATOR users can use all draft order operations. The demo uses ADMIN to create and update the example catalog.
-
-| API path under `/api/v1` | Methods |
-|---|---|
-| `/orders` | `GET` lists orders with optional `status`, `customerId`, `warehouseId`, `page` and `size`. `POST` creates a draft with a unique order number (up to 30 characters), customer ID, warehouse ID and optional note (up to 500 characters). |
-| `/orders/{orderId}` | `GET` returns the header and items. `PUT` replaces the draft's customer, warehouse and note. |
-| `/orders/{orderId}/items` | `POST` adds a product and a positive whole number of units. |
-| `/orders/{orderId}/items/{itemId}` | `GET` reads the line. `PUT` changes quantity. `DELETE` removes a draft line. |
-
-List items contain the order summary. Detail responses contain that summary in `order` and a separate `items` array. Totals use saved item prices, so editing the catalog leaves existing drafts unchanged. An empty draft totals 0.00 PLN. Order numbers stay fixed after creation. A draft is edited through the paths above and confirmed through its own action. The existing Basic authentication and CSRF flow also apply to order writes.
+Add three widgets at 12.50 PLN, try a duplicate line and change the catalog price. Increasing the draft quantity to four keeps the original price and SKU. The demo also edits the header, adds and removes a second line and finds the order by all three list filters. The final total is 50.00 PLN and stock is unchanged.
 
 ### Confirmation and reservations
 
-With the local application running, use an ADMIN account and `jq`:
+`python3 -m demo confirm-orders admin@example.test`
 
-```sh
-./demo/api/confirm-orders.sh admin@example.test
-```
-
-The script creates fictional data in the local application database, receives ten units, and confirms a draft for six. A second draft requests five and receives `409` because only four are available. The draft stays editable, so the script changes it to four and confirms it. The result is ten units on hand, ten reserved, zero available and one physical movement for the original receipt. A repeated confirmation returns `409`.
-
-`POST /api/v1/orders/{orderId}/confirm` accepts no body and returns HTTP `200` with the order detail, `CONFIRMED` status and `confirmedAt`. ADMIN and OPERATOR can confirm. Send Basic credentials and the matching CSRF header and cookie for the write request. An empty draft, an inactive catalog record, missing stock, insufficient availability and an order that already left DRAFT all return `409`. The entire reservation succeeds or rolls back together.
+Receive 10 units and confirm an order for 6. Another order asks for 5 and gets `409`. Reducing it to 4 succeeds. At the end all 10 units are reserved, none are available and the receipt is still the only physical movement. This is a sequential walkthrough. The Java integration tests also exercise simultaneous requests.
 
 ### Fulfillment and cancellation
 
-With the local application running, use an ADMIN account and `jq`:
+`python3 -m demo complete-orders admin@example.test`
+
+Receive 10, confirm and fulfill 3, then confirm and cancel another 2. Cancelling an unconfirmed draft for 20 also succeeds. The only movements are `IN +10` and `OUT −3`, and the issue refers to the fulfilled order.
+
+## Employee accounts
+
+With an existing ADMIN, create an operator, copy the returned UUID and check the operator's login. The final two commands promote and then deactivate that account.
 
 ```sh
-./demo/api/complete-orders.sh admin@example.test
+python3 -m demo employee-accounts admin@example.test create operator@example.test OPERATOR
+python3 -m demo employee-access operator@example.test
+EMPLOYEE_ID='<UUID from the creation response>'
+python3 -m demo employee-accounts admin@example.test role "$EMPLOYEE_ID" ADMIN
+python3 -m demo employee-accounts admin@example.test deactivate "$EMPLOYEE_ID"
 ```
 
-The script receives ten units and fulfills an order for three, leaving seven on hand and zero reserved. It then confirms and cancels an order for two to show those units becoming available again. Finally it cancels a draft for twenty units. The history ends with the original `IN +10` and one `OUT -3` tied to the fulfilled order.
-
-| API action | Allowed starting status | Successful result |
-|---|---|---|
-| `POST /api/v1/orders/{orderId}/fulfill` | `CONFIRMED` | Decrease both on-hand and reserved quantities. Record one `OUT` per line with the order and authenticated employee. Return `FULFILLED`. |
-| `POST /api/v1/orders/{orderId}/cancel` | `DRAFT` or `CONFIRMED` | Release any reservation from the confirmed order. Preserve physical stock and movement history. Return `CANCELLED`. |
-
-The actions accept no body and return HTTP `200` with order detail. ADMIN and OPERATOR use Basic authentication and CSRF as for confirmation. Both can finish an existing confirmed order even after a product or warehouse is deactivated. Repeated actions on terminal orders return `409`. Stock, status and any new movements commit together.
+Creation asks for the ADMIN password, then the new employee password twice. Use a new email for another run. Changes apply on the employee's next request. A disabled employee receives `401`. Demoting or disabling the last active ADMIN returns `409`. For the full endpoint and payload reference, use [local Swagger UI](http://127.0.0.1:8080/swagger-ui.html).
 
 ## Local PostgreSQL
 
-With JDK 25 and Docker running, run `setup` once from the repository root after preparing `.env` using `make init-env`.
+Use Docker Compose and JDK 25 on the host. Run setup once. It starts PostgreSQL, creates `order_inventory_demo`, applies Flyway and loads the [fictional dataset](sql/seed.sql). A second setup refuses to replace an existing database. The API continues to use `order_inventory`.
 
 ```sh
-./demo/sql/run.sh setup
+python3 -m demo sql setup
+python3 -m demo sql orders
+python3 -m demo sql stock
+python3 -m demo sql consistency
 ```
 
-This starts the local PostgreSQL container, creates `order_inventory_demo`, runs the app's Flyway migrations on that database, and inserts fictional records from [seed.sql](sql/seed.sql). The demo database lives alongside `order_inventory` in the same container. Your application and the HTTP demo keep using `order_inventory`. On later runs, reuse the demo database by going straight to the queries below.
+| Report | What to look for |
+| --- | --- |
+| [orders.sql](sql/orders.sql) | Order totals and repeat customers. DEMO-002 totals 45.50 PLN and DEMO-003 totals 23.00 PLN. |
+| [stock.sql](sql/stock.sql) | WIDGET has 7 units available in NORTH and 4 in SOUTH. |
+| [consistency.sql](sql/consistency.sql) | Both queries return zero rows. Any returned row identifies a difference between a stored counter and its source records. |
 
-```sh
-./demo/sql/run.sh orders
-./demo/sql/run.sh stock
-./demo/sql/run.sh consistency
-```
+The Java integration tests load the same SQL files into a disposable PostgreSQL instance. Reports use `psql` inside the local database container in a read-only transaction. To explore individual queries in an editor, connect to `order_inventory_demo` on the local `DB_PORT` using `inventory_local` and `DB_PASSWORD` from `.env`.
 
-- [orders.sql](sql/orders.sql) shows order totals and repeat customers. Expect `DEMO-002` to total `45.50` PLN and `DEMO-003` to total `23.00` PLN.
-- [stock.sql](sql/stock.sql) shows how many units are on hand, reserved and available per warehouse. Expect `WIDGET` to have 7 available units in NORTH and 4 in SOUTH.
-- [consistency.sql](sql/consistency.sql) compares reservations with confirmed order items and physical stock with recorded movements. Both results should be empty.
+## Extend a walkthrough
 
-The read commands use `psql` inside the existing `db` container and run the selected file in a read-only transaction. You can also open any of the query files in your SQL editor and run individual statements against `order_inventory_demo` using the local port in `.env` (5432 by default), the `inventory_local` user and `DB_PASSWORD`.
-
-The seed contains an inactive employee for foreign keys. Use the [initial administrator setup](../README.md#initial-administrator-and-employee-access) for the HTTP demo. The integration tests use the same `seed.sql` on their own disposable PostgreSQL instance.
+For a new HTTP scenario, add a function in [scenarios.py](scenarios.py) and register it in [the CLI](__main__.py). The [client](client.py) handles Basic authentication, cookies, CSRF and expected HTTP statuses. Check the business outcome as well, such as the balance or the order linked to a movement. For a new SQL report, add its query under `demo/sql/` and include its name in the CLI's SQL choices. The [SQL runner](sql_runner.py) handles connections and read-only execution.

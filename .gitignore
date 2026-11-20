@@ -60,3 +60,6 @@ flyway-password
 ### draw.io editor backups ###
 **/.$*.drawio.bkp
 **/.$*.drawio.dtmp
+
+### Python demo ###
+__pycache__/

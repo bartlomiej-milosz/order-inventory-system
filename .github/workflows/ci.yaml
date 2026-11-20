@@ -44,3 +44,5 @@ jobs:
           docker compose --profile app up --build --wait --wait-timeout 120
           curl --fail --silent --show-error http://127.0.0.1:8080/v3/api-docs >/dev/null
           .github/scripts/verify-stack.sh
+          python3 -m demo sql setup
+          for report in orders stock consistency; do python3 -m demo sql "$report"; done
