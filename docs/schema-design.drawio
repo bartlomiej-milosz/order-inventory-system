@@ -952,8 +952,95 @@
             <mxRectangle height="30" width="90" as="alternateBounds" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="legend" parent="1" style="rounded=1;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=20;fontFamily=Helvetica;fontSize=13;fillColor=#f5f5f5;strokeColor=#cccccc;roundedPerimeter=1;" value="&lt;font face=&quot;JetBrains Mono&quot;&gt;&lt;b&gt;LEGEND &amp;amp; COMPOSITE KEYS&lt;/b&gt;&lt;br&gt;&lt;br&gt;PK — primary key · FK — foreign key&lt;br&gt;UQ — unique value · N — nullable&lt;br&gt;All other fields are NOT NULL.&lt;br&gt;&lt;br&gt;|| &amp;nbsp; 1 = exactly one&lt;/font&gt;&lt;div&gt;&lt;font face=&quot;JetBrains Mono&quot;&gt;o| &amp;nbsp; 0..1 = zero or one&lt;br&gt;o&amp;lt; &amp;nbsp; 0..N = zero or many&lt;br&gt;&lt;br&gt;&lt;b&gt;UNIQUE pairs&lt;/b&gt;&lt;br&gt;stock_levels: (product_id, warehouse_id)&lt;br&gt;order_items: (order_id, product_id)&lt;br&gt;&lt;br&gt;&lt;b&gt;available = on_hand − reserved&lt;/b&gt;&lt;br&gt;Confirm: reserve · Fulfill: issue&lt;br&gt;Cancel: release, no physical movement&lt;br&gt;&lt;br&gt;Rules and checks: “Design notes” tab.&lt;/font&gt;&lt;/div&gt;" vertex="1">
-          <mxGeometry height="370" width="360" x="1360" y="920" as="geometry" />
+        <mxCell id="legend" parent="1" style="rounded=1;arcSize=5;html=1;fillColor=#f7f9fc;strokeColor=#aabed5;strokeWidth=1;container=1;collapsible=0;recursiveResize=0;" value="" vertex="1">
+          <mxGeometry as="geometry" x="1360" y="920" width="360" height="370" />
+        </mxCell>
+        <mxCell id="legend_heading" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=21;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Schema legend" vertex="1">
+          <mxGeometry as="geometry" x="20" y="13" width="320" height="30" />
+        </mxCell>
+        <mxCell id="legend_fields" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Column markers" vertex="1">
+          <mxGeometry as="geometry" x="20" y="54" width="320" height="21" />
+        </mxCell>
+        <mxCell id="legend_PK" parent="legend" style="text;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=13;fontStyle=1;fontColor=#253750;fillColor=#dae8fc;strokeColor=none;rounded=1;arcSize=14;" value="PK" vertex="1">
+          <mxGeometry as="geometry" x="20" y="85" width="36" height="24" />
+        </mxCell>
+        <mxCell id="legend_PK_desc" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Primary key" vertex="1">
+          <mxGeometry as="geometry" x="64" y="85" width="110" height="24" />
+        </mxCell>
+        <mxCell id="legend_FK" parent="legend" style="text;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=13;fontStyle=1;fontColor=#253750;fillColor=#dae8fc;strokeColor=none;rounded=1;arcSize=14;" value="FK" vertex="1">
+          <mxGeometry as="geometry" x="185" y="85" width="36" height="24" />
+        </mxCell>
+        <mxCell id="legend_FK_desc" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Foreign key" vertex="1">
+          <mxGeometry as="geometry" x="229" y="85" width="110" height="24" />
+        </mxCell>
+        <mxCell id="legend_UQ" parent="legend" style="text;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=13;fontStyle=1;fontColor=#253750;fillColor=#dae8fc;strokeColor=none;rounded=1;arcSize=14;" value="UQ" vertex="1">
+          <mxGeometry as="geometry" x="20" y="118" width="36" height="24" />
+        </mxCell>
+        <mxCell id="legend_UQ_desc" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Unique value" vertex="1">
+          <mxGeometry as="geometry" x="64" y="118" width="110" height="24" />
+        </mxCell>
+        <mxCell id="legend_N" parent="legend" style="text;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=13;fontStyle=1;fontColor=#253750;fillColor=#dae8fc;strokeColor=none;rounded=1;arcSize=14;" value="N" vertex="1">
+          <mxGeometry as="geometry" x="185" y="118" width="36" height="24" />
+        </mxCell>
+        <mxCell id="legend_N_desc" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Nullable" vertex="1">
+          <mxGeometry as="geometry" x="229" y="118" width="110" height="24" />
+        </mxCell>
+        <mxCell id="legend_null" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#41566e;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Fields without N require a value." vertex="1">
+          <mxGeometry as="geometry" x="20" y="150" width="320" height="21" />
+        </mxCell>
+        <mxCell id="legend_divider" parent="legend" edge="1" style="endArrow=none;endSize=11;endFill=0;startArrow=none;strokeWidth=1;strokeColor=#aabed5;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="20" y="185" />
+            <mxPoint as="targetPoint" x="340" y="185" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend_cardinality" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Relationship ends" vertex="1">
+          <mxGeometry as="geometry" x="20" y="196" width="320" height="22" />
+        </mxCell>
+        <mxCell id="legend_marker_0" parent="legend" edge="1" style="endArrow=ERmandOne;endSize=11;endFill=0;startArrow=none;strokeWidth=1.5;strokeColor=#253750;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="20" y="240" />
+            <mxPoint as="targetPoint" x="67" y="240" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend_range_0" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=14;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="1" vertex="1">
+          <mxGeometry as="geometry" x="85" y="229" width="60" height="22" />
+        </mxCell>
+        <mxCell id="legend_card_0" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Exactly one" vertex="1">
+          <mxGeometry as="geometry" x="155" y="229" width="165" height="22" />
+        </mxCell>
+        <mxCell id="legend_marker_1" parent="legend" edge="1" style="endArrow=ERzeroToOne;endSize=11;endFill=0;startArrow=none;strokeWidth=1.5;strokeColor=#253750;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="20" y="271" />
+            <mxPoint as="targetPoint" x="67" y="271" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend_range_1" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=14;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="0..1" vertex="1">
+          <mxGeometry as="geometry" x="85" y="260" width="60" height="22" />
+        </mxCell>
+        <mxCell id="legend_card_1" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Zero or one" vertex="1">
+          <mxGeometry as="geometry" x="155" y="260" width="165" height="22" />
+        </mxCell>
+        <mxCell id="legend_marker_2" parent="legend" edge="1" style="endArrow=ERzeroToMany;endSize=11;endFill=0;startArrow=none;strokeWidth=1.5;strokeColor=#253750;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="20" y="302" />
+            <mxPoint as="targetPoint" x="67" y="302" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend_range_2" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=14;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="0..N" vertex="1">
+          <mxGeometry as="geometry" x="85" y="291" width="60" height="22" />
+        </mxCell>
+        <mxCell id="legend_card_2" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=14;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Zero or many" vertex="1">
+          <mxGeometry as="geometry" x="155" y="291" width="165" height="22" />
+        </mxCell>
+        <mxCell id="legend_divider_bottom" parent="legend" edge="1" style="endArrow=none;endSize=11;endFill=0;startArrow=none;strokeWidth=1;strokeColor=#aabed5;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="20" y="326" />
+            <mxPoint as="targetPoint" x="340" y="326" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend_pointer" parent="legend" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=13;fontStyle=0;fontColor=#41566e;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Composite keys and examples → Design notes" vertex="1">
+          <mxGeometry as="geometry" x="20" y="334" width="324" height="27" />
         </mxCell>
         <mxCell id="customer_orders" edge="1" parent="1" source="customers.id" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;fontSize=12;fontFamily=JetBrains Mono;startSize=12;endSize=12;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToMany;endFill=0;exitX=1;exitY=0.5;entryX=0;entryY=0.5;exitDx=0;exitDy=0;entryDx=0;entryDy=0;jumpStyle=arc;jumpSize=10;strokeColor=#9673a6;strokeWidth=1.5;fillColor=#e1d5e7;" target="sales_orders.customer_id">
           <mxGeometry relative="1" x="0.0769" as="geometry">
@@ -1146,31 +1233,244 @@
       </root>
     </mxGraphModel>
   </diagram>
-  <diagram name="Design notes" id="notes">
-    <mxGraphModel dx="3337" dy="1745" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2000" pageHeight="1600" background="#ffffff" math="0" shadow="0">
+  <diagram id="notes" name="Design notes">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1190" pageHeight="1040" background="#ffffff" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="title_notes" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=16;fontColor=#334155;spacing=0;fontSize=30;fontStyle=1;" value="Order and inventory design notes" vertex="1">
-          <mxGeometry height="50" width="1450" x="60" y="30" as="geometry" />
+        <mxCell id="title_notes" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=32;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Order and inventory design notes" vertex="1">
+          <mxGeometry as="geometry" x="48" y="30" width="1100" height="48" />
         </mxCell>
-        <mxCell id="note_0" parent="1" style="rounded=0;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=20;fontFamily=Helvetica;fontSize=16;fillColor=#f8fafc;strokeColor=#cbd5e1;" value="&lt;b&gt;Scope &amp; defaults&lt;/b&gt;&lt;br&gt;&lt;br&gt;8 domain tables in schema inventory; Flyway history is technical, outside this count.&lt;br&gt;Multiple warehouses; one warehouse per order; whole-order fulfillment/cancellation only; integer quantities; PLN.&lt;br&gt;No categories, separate reservation table, partial fulfillment, transfers, expiry or post-fulfillment returns.&lt;br&gt;UUID IDs generated by the application; created_at defaults to now(); active defaults to true.&lt;br&gt;sales_orders.status defaults to DRAFT. stock_levels.on_hand/reserved default to 0; application sets updated_at." vertex="1">
-          <mxGeometry height="205" width="1500" x="60" y="110" as="geometry" />
+        <mxCell id="notes_subtitle" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=17;fontStyle=0;fontColor=#41566e;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="One warehouse per order  ·  Whole units  ·  Prices in PLN  ·  Full-order fulfillment" vertex="1">
+          <mxGeometry as="geometry" x="50" y="82" width="1100" height="28" />
         </mxCell>
-        <mxCell id="note_1" parent="1" style="rounded=0;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=20;fontFamily=Helvetica;fontSize=16;fillColor=#f8fafc;strokeColor=#cbd5e1;" value="&lt;b&gt;Keys &amp; checks&lt;/b&gt;&lt;br&gt;&lt;br&gt;UNIQUE pairs: stock_levels(product_id, warehouse_id), order_items(order_id, product_id).&lt;br&gt;Other UQ fields are marked in the diagram. All fields NOT NULL except N; all FK use ON DELETE RESTRICT.&lt;br&gt;CHECK: on_hand &amp;gt;= 0; reserved &amp;gt;= 0; reserved &amp;lt;= on_hand; item quantity &amp;gt; 0; both unit prices &amp;gt;= 0.&lt;br&gt;role IN (ADMIN, OPERATOR); status IN (DRAFT, CONFIRMED, FULFILLED, CANCELLED).&lt;br&gt;IN: quantity_delta &amp;gt; 0 and order_id NULL. OUT: quantity_delta &amp;lt; 0 and order_id NOT NULL.&lt;br&gt;ADJUSTMENT: quantity_delta &amp;lt;&amp;gt; 0, order_id NULL, nonblank note required.&lt;br&gt;confirmed_at is NULL in DRAFT, required in CONFIRMED/FULFILLED, retained on cancellation.&lt;br&gt;Normalize user emails to lowercase; validate nonblank names/codes. Index FK not covered by existing PK/UQ indexes." vertex="1">
-          <mxGeometry height="286" width="1500" x="60" y="337" as="geometry" />
+        <mxCell id="rows" parent="1" style="rounded=1;arcSize=5;html=1;fillColor=#f7f9fc;strokeColor=#aabed5;strokeWidth=1;container=1;collapsible=0;recursiveResize=0;" value="" vertex="1">
+          <mxGeometry as="geometry" x="48" y="138" width="544" height="214" />
         </mxCell>
-        <mxCell id="note_2" parent="1" style="rounded=0;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=20;fontFamily=Helvetica;fontSize=16;fillColor=#f8fafc;strokeColor=#cbd5e1;" value="&lt;b&gt;Orders &amp; derived reservations&lt;/b&gt;&lt;br&gt;&lt;br&gt;A DRAFT order may be empty. Confirmation requires at least one item and active products/warehouse.&lt;br&gt;Copy product_name, product_sku and unit_price into each item; quantity edits retain these snapshots.&lt;br&gt;UNIQUE(order_id, product_id): duplicate addition returns 409; update the existing item instead.&lt;br&gt;Confirmed items, customer and warehouse are immutable. Total = SUM(quantity * unit_price), not stored.&lt;br&gt;reserved = SUM(item.quantity) for CONFIRMED orders of the same product and warehouse.&lt;br&gt;No separate reservation lifecycle: this model assumes only whole-order confirmation, fulfillment and cancellation.&lt;br&gt;Deactivation does not prevent fulfillment/cancellation of already confirmed orders." vertex="1">
-          <mxGeometry height="259" width="1500" x="60" y="645" as="geometry" />
+        <mxCell id="rows_title" parent="rows" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=21;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Keys and row constraints" vertex="1">
+          <mxGeometry as="geometry" x="18" y="13" width="508" height="30" />
         </mxCell>
-        <mxCell id="note_3" parent="1" style="rounded=0;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=20;fontFamily=Helvetica;fontSize=16;fillColor=#f8fafc;strokeColor=#cbd5e1;" value="&lt;b&gt;State transitions &amp; physical stock&lt;/b&gt;&lt;br&gt;&lt;br&gt;DRAFT → CONFIRMED: reserve all items (reserved + quantity); on_hand unchanged; no movement.&lt;br&gt;CONFIRMED → FULFILLED: on_hand − quantity, reserved − quantity; one OUT movement per item.&lt;br&gt;CONFIRMED → CANCELLED: reserved − quantity; on_hand unchanged; no movement.&lt;br&gt;DRAFT → CANCELLED: no stock effect. FULFILLED/CANCELLED are terminal; repeated invalid actions return 409.&lt;br&gt;IN and ADJUSTMENT change on_hand and append a movement; on_hand must remain at least reserved.&lt;br&gt;on_hand = SUM(quantity_delta) for the stock row. Start at 0 and add opening stock via IN.&lt;br&gt;Stock movements are append-only. OUT must match the linked order warehouse and one of its products." vertex="1">
-          <mxGeometry height="259" width="1500" x="60" y="926" as="geometry" />
+        <mxCell id="rows_key0" parent="rows" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Stock level" vertex="1">
+          <mxGeometry as="geometry" x="18" y="58" width="121" height="44" />
         </mxCell>
-        <mxCell id="note_4" parent="1" style="rounded=0;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=20;fontFamily=Helvetica;fontSize=16;fillColor=#f8fafc;strokeColor=#cbd5e1;" value="&lt;b&gt;Transactions, locking &amp; missing rows&lt;/b&gt;&lt;br&gt;&lt;br&gt;For order mutations: lock sales_orders first, recheck status, then lock stock_levels in ascending id order.&lt;br&gt;DRAFT item/header edits also lock the order, preventing edits racing with confirmation.&lt;br&gt;Change status, counters and movement history in one transaction; failure of any item rolls everything back.&lt;br&gt;Receipts/adjustments lock stock_levels. A missing pair means zero availability.&lt;br&gt;First receipt: INSERT stock row ON CONFLICT DO NOTHING, then lock/update it and append IN in one transaction.&lt;br&gt;Use PostgreSQL READ COMMITTED with explicit row locks; never read/check/write counters without synchronization.&lt;br&gt;Cross-table sums and OUT/order consistency are service invariants, verified by integration/concurrency tests." vertex="1">
-          <mxGeometry height="259" width="1500" x="60" y="1207" as="geometry" />
+        <mxCell id="rows_val0" parent="rows" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="One row per (product_id, warehouse_id)." vertex="1">
+          <mxGeometry as="geometry" x="145" y="58" width="382" height="44" />
         </mxCell>
-        <mxCell id="note_5" parent="1" style="rounded=0;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=20;fontFamily=Helvetica;fontSize=16;fillColor=#f8fafc;strokeColor=#cbd5e1;" value="&lt;b&gt;Access &amp; verification&lt;/b&gt;&lt;br&gt;&lt;br&gt;ADMIN manages catalog, users and corrections; ADMIN/OPERATOR handle orders and receipts.&lt;br&gt;created_by/performed_by come from the authenticated employee, never an arbitrary request field.&lt;br&gt;Keep history; deactivate users/products/warehouses instead of deleting referenced rows.&lt;br&gt;Verify: overselling across orders; confirm/confirm, fulfill/cancel and edit/confirm on the same order; first-receipt race.&lt;br&gt;Diagram cardinalities describe FK constraints. Minimum one item at confirmation is an application rule.&lt;br&gt;See README.md for the implemented API and demo/sql/ for stock and order reports." vertex="1">
-          <mxGeometry height="232" width="1500" x="60" y="1488" as="geometry" />
+        <mxCell id="rows_key1" parent="rows" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Order item" vertex="1">
+          <mxGeometry as="geometry" x="18" y="108" width="121" height="44" />
+        </mxCell>
+        <mxCell id="rows_val1" parent="rows" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="One row per (order_id, product_id)." vertex="1">
+          <mxGeometry as="geometry" x="145" y="108" width="382" height="44" />
+        </mxCell>
+        <mxCell id="rows_key2" parent="rows" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Quantity checks" vertex="1">
+          <mxGeometry as="geometry" x="18" y="158" width="121" height="44" />
+        </mxCell>
+        <mxCell id="rows_val2" parent="rows" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="0 ≤ reserved ≤ on_hand. Ordered quantities must be positive and unit prices nonnegative." vertex="1">
+          <mxGeometry as="geometry" x="145" y="158" width="382" height="44" />
+        </mxCell>
+        <mxCell id="history" parent="1" style="rounded=1;arcSize=5;html=1;fillColor=#f7f9fc;strokeColor=#aabed5;strokeWidth=1;container=1;collapsible=0;recursiveResize=0;" value="" vertex="1">
+          <mxGeometry as="geometry" x="614" y="138" width="544" height="214" />
+        </mxCell>
+        <mxCell id="history_title" parent="history" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=21;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="History and prices" vertex="1">
+          <mxGeometry as="geometry" x="18" y="13" width="508" height="30" />
+        </mxCell>
+        <mxCell id="history_key0" parent="history" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Item snapshot" vertex="1">
+          <mxGeometry as="geometry" x="18" y="58" width="121" height="44" />
+        </mxCell>
+        <mxCell id="history_val0" parent="history" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Adding an item copies its SKU, name and price. Later quantity edits keep that snapshot." vertex="1">
+          <mxGeometry as="geometry" x="145" y="58" width="382" height="44" />
+        </mxCell>
+        <mxCell id="history_key1" parent="history" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Order total" vertex="1">
+          <mxGeometry as="geometry" x="18" y="108" width="121" height="44" />
+        </mxCell>
+        <mxCell id="history_val1" parent="history" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Sum quantity × saved unit price across the items. An empty draft totals 0.00 PLN." vertex="1">
+          <mxGeometry as="geometry" x="145" y="108" width="382" height="44" />
+        </mxCell>
+        <mxCell id="history_key2" parent="history" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Physical ledger" vertex="1">
+          <mxGeometry as="geometry" x="18" y="158" width="121" height="44" />
+        </mxCell>
+        <mxCell id="history_val2" parent="history" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Each OUT points to its order and employee. IN and ADJUSTMENT have no order link." vertex="1">
+          <mxGeometry as="geometry" x="145" y="158" width="382" height="44" />
+        </mxCell>
+        <mxCell id="tx" parent="1" style="rounded=1;arcSize=5;html=1;fillColor=#f7f9fc;strokeColor=#aabed5;strokeWidth=1;container=1;collapsible=0;recursiveResize=0;" value="" vertex="1">
+          <mxGeometry as="geometry" x="48" y="372" width="544" height="214" />
+        </mxCell>
+        <mxCell id="tx_title" parent="tx" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=21;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="What a transaction protects" vertex="1">
+          <mxGeometry as="geometry" x="18" y="13" width="508" height="30" />
+        </mxCell>
+        <mxCell id="tx_key0" parent="tx" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="First receipt" vertex="1">
+          <mxGeometry as="geometry" x="18" y="58" width="121" height="44" />
+        </mxCell>
+        <mxCell id="tx_val0" parent="tx" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Insert the stock row if needed. Lock it, add the received units and record an IN movement." vertex="1">
+          <mxGeometry as="geometry" x="145" y="58" width="382" height="44" />
+        </mxCell>
+        <mxCell id="tx_key1" parent="tx" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Confirmation" vertex="1">
+          <mxGeometry as="geometry" x="18" y="108" width="121" height="44" />
+        </mxCell>
+        <mxCell id="tx_val1" parent="tx" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Lock the draft, active products and warehouse, then lock the stock rows in ascending ID order." vertex="1">
+          <mxGeometry as="geometry" x="145" y="108" width="382" height="44" />
+        </mxCell>
+        <mxCell id="tx_key2" parent="tx" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Atomic writes" vertex="1">
+          <mxGeometry as="geometry" x="18" y="158" width="121" height="44" />
+        </mxCell>
+        <mxCell id="tx_val2" parent="tx" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Status, counters and any movements commit together. A shortage rolls back every line." vertex="1">
+          <mxGeometry as="geometry" x="145" y="158" width="382" height="44" />
+        </mxCell>
+        <mxCell id="checks" parent="1" style="rounded=1;arcSize=5;html=1;fillColor=#f7f9fc;strokeColor=#aabed5;strokeWidth=1;container=1;collapsible=0;recursiveResize=0;" value="" vertex="1">
+          <mxGeometry as="geometry" x="614" y="372" width="544" height="214" />
+        </mxCell>
+        <mxCell id="checks_title" parent="checks" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=21;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="How to reconcile stock" vertex="1">
+          <mxGeometry as="geometry" x="18" y="13" width="508" height="30" />
+        </mxCell>
+        <mxCell id="checks_key0" parent="checks" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Physical stock" vertex="1">
+          <mxGeometry as="geometry" x="18" y="58" width="121" height="44" />
+        </mxCell>
+        <mxCell id="checks_val0" parent="checks" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Sum signed movement deltas per stock row. IN adds units, OUT removes them. Corrections can do either." vertex="1">
+          <mxGeometry as="geometry" x="145" y="58" width="382" height="44" />
+        </mxCell>
+        <mxCell id="checks_key1" parent="checks" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Reserved stock" vertex="1">
+          <mxGeometry as="geometry" x="18" y="108" width="121" height="44" />
+        </mxCell>
+        <mxCell id="checks_val1" parent="checks" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Sum line quantities on CONFIRMED orders for the same product and warehouse." vertex="1">
+          <mxGeometry as="geometry" x="145" y="108" width="382" height="44" />
+        </mxCell>
+        <mxCell id="checks_key2" parent="checks" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Availability" vertex="1">
+          <mxGeometry as="geometry" x="18" y="158" width="121" height="44" />
+        </mxCell>
+        <mxCell id="checks_val2" parent="checks" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Subtract reserved from on_hand. A missing stock row for an existing catalog pair means zero." vertex="1">
+          <mxGeometry as="geometry" x="145" y="158" width="382" height="44" />
+        </mxCell>
+        <mxCell id="trace_title" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=24;fontStyle=1;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="One order for three units" vertex="1">
+          <mxGeometry as="geometry" x="48" y="612" width="1100" height="36" />
+        </mxCell>
+        <mxCell id="trace_caption" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=16;fontStyle=0;fontColor=#41566e;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Read the first three rows in order. Each of the last two starts from the same confirmed order." vertex="1">
+          <mxGeometry as="geometry" x="48" y="653" width="1100" height="26" />
+        </mxCell>
+        <mxCell id="trace" parent="1" style="rounded=1;arcSize=5;html=1;fillColor=#ffffff;strokeColor=#aabed5;strokeWidth=1;container=1;collapsible=0;recursiveResize=0;" value="" vertex="1">
+          <mxGeometry as="geometry" x="48" y="697" width="1110" height="240" />
+        </mxCell>
+        <mxCell id="trace_header_0" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Operation" vertex="1">
+          <mxGeometry as="geometry" x="20" y="5" width="370" height="30" />
+        </mxCell>
+        <mxCell id="trace_header_1" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="On hand" vertex="1">
+          <mxGeometry as="geometry" x="398" y="5" width="145" height="30" />
+        </mxCell>
+        <mxCell id="trace_header_2" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Reserved" vertex="1">
+          <mxGeometry as="geometry" x="550" y="5" width="140" height="30" />
+        </mxCell>
+        <mxCell id="trace_header_3" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Available" vertex="1">
+          <mxGeometry as="geometry" x="698" y="5" width="140" height="30" />
+        </mxCell>
+        <mxCell id="trace_header_4" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=1;fontColor=#355e92;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="New movement" vertex="1">
+          <mxGeometry as="geometry" x="855" y="5" width="230" height="30" />
+        </mxCell>
+        <mxCell id="trace_rule_0" parent="trace" edge="1" style="endArrow=none;endSize=11;endFill=0;startArrow=none;strokeWidth=1;strokeColor=#aabed5;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="16" y="39" />
+            <mxPoint as="targetPoint" x="1093" y="39" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="trace_0_0" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Receive 10 units" vertex="1">
+          <mxGeometry as="geometry" x="20" y="41" width="370" height="35" />
+        </mxCell>
+        <mxCell id="trace_0_1" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="10" vertex="1">
+          <mxGeometry as="geometry" x="398" y="41" width="145" height="35" />
+        </mxCell>
+        <mxCell id="trace_0_2" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="0" vertex="1">
+          <mxGeometry as="geometry" x="550" y="41" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_0_3" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="10" vertex="1">
+          <mxGeometry as="geometry" x="698" y="41" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_0_4" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="IN  +10" vertex="1">
+          <mxGeometry as="geometry" x="855" y="41" width="230" height="35" />
+        </mxCell>
+        <mxCell id="trace_rule_1" parent="trace" edge="1" style="endArrow=none;endSize=11;endFill=0;startArrow=none;strokeWidth=1;strokeColor=#aabed5;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="16" y="79" />
+            <mxPoint as="targetPoint" x="1093" y="79" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="trace_1_0" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Create draft for 3" vertex="1">
+          <mxGeometry as="geometry" x="20" y="81" width="370" height="35" />
+        </mxCell>
+        <mxCell id="trace_1_1" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="10" vertex="1">
+          <mxGeometry as="geometry" x="398" y="81" width="145" height="35" />
+        </mxCell>
+        <mxCell id="trace_1_2" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="0" vertex="1">
+          <mxGeometry as="geometry" x="550" y="81" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_1_3" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="10" vertex="1">
+          <mxGeometry as="geometry" x="698" y="81" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_1_4" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="—" vertex="1">
+          <mxGeometry as="geometry" x="855" y="81" width="230" height="35" />
+        </mxCell>
+        <mxCell id="trace_rule_2" parent="trace" edge="1" style="endArrow=none;endSize=11;endFill=0;startArrow=none;strokeWidth=1;strokeColor=#aabed5;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="16" y="119" />
+            <mxPoint as="targetPoint" x="1093" y="119" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="trace_2_0" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Confirm and reserve 3" vertex="1">
+          <mxGeometry as="geometry" x="20" y="121" width="370" height="35" />
+        </mxCell>
+        <mxCell id="trace_2_1" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="10" vertex="1">
+          <mxGeometry as="geometry" x="398" y="121" width="145" height="35" />
+        </mxCell>
+        <mxCell id="trace_2_2" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="3" vertex="1">
+          <mxGeometry as="geometry" x="550" y="121" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_2_3" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="7" vertex="1">
+          <mxGeometry as="geometry" x="698" y="121" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_2_4" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="—" vertex="1">
+          <mxGeometry as="geometry" x="855" y="121" width="230" height="35" />
+        </mxCell>
+        <mxCell id="trace_rule_3" parent="trace" edge="1" style="endArrow=none;endSize=11;endFill=0;startArrow=none;strokeWidth=1;strokeColor=#aabed5;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="16" y="159" />
+            <mxPoint as="targetPoint" x="1093" y="159" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="trace_3_0" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Fulfill confirmed order" vertex="1">
+          <mxGeometry as="geometry" x="20" y="161" width="370" height="35" />
+        </mxCell>
+        <mxCell id="trace_3_1" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="7" vertex="1">
+          <mxGeometry as="geometry" x="398" y="161" width="145" height="35" />
+        </mxCell>
+        <mxCell id="trace_3_2" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="0" vertex="1">
+          <mxGeometry as="geometry" x="550" y="161" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_3_3" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="7" vertex="1">
+          <mxGeometry as="geometry" x="698" y="161" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_3_4" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="OUT  −3" vertex="1">
+          <mxGeometry as="geometry" x="855" y="161" width="230" height="35" />
+        </mxCell>
+        <mxCell id="trace_rule_4" parent="trace" edge="1" style="endArrow=none;endSize=11;endFill=0;startArrow=none;strokeWidth=1;strokeColor=#aabed5;html=1;">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="16" y="199" />
+            <mxPoint as="targetPoint" x="1093" y="199" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="trace_4_0" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Cancel confirmed order" vertex="1">
+          <mxGeometry as="geometry" x="20" y="201" width="370" height="35" />
+        </mxCell>
+        <mxCell id="trace_4_1" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="10" vertex="1">
+          <mxGeometry as="geometry" x="398" y="201" width="145" height="35" />
+        </mxCell>
+        <mxCell id="trace_4_2" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="0" vertex="1">
+          <mxGeometry as="geometry" x="550" y="201" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_4_3" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="10" vertex="1">
+          <mxGeometry as="geometry" x="698" y="201" width="140" height="35" />
+        </mxCell>
+        <mxCell id="trace_4_4" parent="trace" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=JetBrains Mono;fontSize=16;fontStyle=0;fontColor=#253750;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="—" vertex="1">
+          <mxGeometry as="geometry" x="855" y="201" width="230" height="35" />
+        </mxCell>
+        <mxCell id="draft_cancel" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;spacing=0;fontFamily=Helvetica;fontSize=15;fontStyle=0;fontColor=#41566e;fillColor=none;strokeColor=none;rounded=0;arcSize=14;" value="Cancelling a draft changes only its status. Fulfilled and cancelled orders are final." vertex="1">
+          <mxGeometry as="geometry" x="48" y="948" width="1110" height="27" />
         </mxCell>
       </root>
     </mxGraphModel>

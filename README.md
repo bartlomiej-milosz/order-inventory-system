@@ -49,7 +49,15 @@ The demo receives 10 units, fulfills 3, then confirms and cancels a second order
 
 ## Model and transaction boundaries
 
-One Spring Boot service uses eight business tables for employees, customers, products, warehouses, stock levels, order headers, order items and physical movements. Controllers handle HTTP, services set transaction boundaries and repositories issue queries and locks. [Database diagram](docs/schema-design.drawio) · [Schema migration](src/main/resources/db/migration/)
+Each order belongs to one customer and one warehouse. Its lines point to products, while stock levels track how many units of each product are on hand and reserved in each warehouse.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/inventory-schema-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/inventory-schema-light.png">
+  <img src="docs/inventory-schema-light.png" alt="Eight-table PostgreSQL schema linking customers and employees to sales orders, and products and warehouses to stock levels and movements.">
+</picture>
+
+A single Spring Boot service manages these tables. Controllers handle HTTP, services set transaction boundaries and repositories issue queries and locks. [Editable diagram and design notes](docs/schema-design.drawio) · [Schema migration](src/main/resources/db/migration/)
 
 | Operation on one order | On hand | Reserved | Available | Movement |
 | --- | ---: | ---: | ---: | --- |
