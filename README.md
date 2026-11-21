@@ -1,34 +1,12 @@
 # Order & Inventory Management System
 
-A Java 25 / Spring Boot backend for employees managing B2B orders across warehouses. Each order belongs to one customer and one warehouse. Confirming three units reserves them, fulfilling the order records their physical issue, and cancelling a confirmed order releases them. If a warehouse holds ten units and three are reserved, seven are available.
+A Java 25 and Spring Boot API for B2B order processing. Employees receive goods into a warehouse, reserve them for a customer, then fulfill or cancel the order. PostgreSQL keeps a physical movement history and protects stock when several employees confirm orders at the same time.
 
-**What works today:** PostgreSQL migrations, eight JPA entity mappings, employee sign-in and account administration, customer, product and warehouse management, stock receipts and adjustments, movement history, draft orders with price snapshots, transactional confirmation, fulfillment and cancellation, health checks, local Swagger UI, and demos for the API and SQL. [Editable database diagram](docs/schema-design.drawio) · [Demo and sample queries](demo/README.md)
-
-[Run locally](#run-locally) · [Create the first administrator](#initial-administrator-and-employee-access) · [Develop and test](#develop-and-test) · [Deploy on a server](#deploy-on-a-server) · [Troubleshooting](#troubleshooting)
-
-## Model and transaction boundaries
-
-One Spring Boot application serves the HTTP API and writes to PostgreSQL. Controllers validate request DTOs, services implement business rules inside transactions, and Spring Data repositories issue the reads and locks. Flyway owns the database schema. The eight business tables cover employees, customers, products, warehouses, stock per product and warehouse, order headers, order lines, and physical movements.
-
-| Action in one warehouse | On hand | Reserved | Available | Physical movement |
-| --- | ---: | ---: | ---: | --- |
-| Receive 10 units | 10 | 0 | 10 | IN +10 |
-| Create a draft for 3 units | 10 | 0 | 10 | — |
-| Confirm the draft | 10 | 3 | 7 | — |
-| Fulfill the confirmed order | 7 | 0 | 7 | OUT −3 |
-| Alternatively, cancel immediately after confirmation | 10 | 0 | 10 | — |
-
-Each order uses one warehouse and is processed in full. Lines retain the product name, SKU and price from the time the employee added them. Prices are in PLN and quantities are whole units. Payments, returns and transfers between warehouses are outside this release.
-
-Order edits and transitions lock the order header before checking its status. Confirmation checks active catalog entries and locks all required stock rows by ID. A shortage on any line rolls back the entire confirmation. The stock counter and the sum of confirmed lines can be compared independently with the SQL reports. [Order service](src/main/java/dev/bartlomiejmilosz/inventory/orders/OrderService.java) · [Reconciliation queries](demo/sql/consistency.sql)
+[Run locally](#run-locally) · [Try the demos](demo/README.md) · [Develop and test](#develop-and-test) · [Deploy on a server](#deploy-on-a-server) · [Troubleshooting](#troubleshooting)
 
 ## Run locally
 
-Use a macOS or Linux terminal with Git, Bash, Make, OpenSSL, curl and Docker with the Compose v2 plugin. Start the Docker engine. The full-stack path builds Java inside Docker. A host JDK is needed only to run Maven or develop in an IDE.
-
-### 1. Start the application and database
-
-From a new checkout:
+On macOS or Linux, start Docker with Compose v2 and have Git, Bash, Make, OpenSSL and curl available. Run the commands below from the repository root after cloning. Docker builds Java inside the image.
 
 ```sh
 git clone https://github.com/bartlomiej-milosz/order-inventory-system.git
@@ -37,121 +15,92 @@ make start-stack
 make check-readiness
 ```
 
-If you already have the checkout, run `make start-stack` in its root. All commands below use that directory. The first build downloads the JDK image and Maven dependencies. Make creates a private `.env` with a random local database password on first use. Compose starts PostgreSQL and the app in the background, Flyway applies migrations, and Hibernate checks the mappings. The readiness response should be `{"status":"UP"}`.
-
-By default the API listens on host loopback port 8080 and PostgreSQL on loopback port 5432. To choose other host ports **before starting**, run `make init-env`, edit `APP_PORT` and `DB_PORT` in `.env`, then run `make start-stack`. Use the configured API port in browser and curl examples. Keep the generated `DB_PASSWORD` with the local database volume across restarts.
+Wait for `{"status":"UP"}`. The first start generates a private `.env`, starts PostgreSQL, runs Flyway migrations and validates the JPA mappings. The API listens on `127.0.0.1:8080` and PostgreSQL on `127.0.0.1:5432`. To choose other ports before first start, run `make init-env`, edit `APP_PORT` and `DB_PORT` in `.env`, then start the stack.
 
 <a id="initial-administrator-and-employee-access"></a>
 
-### 2. Create your login once
+### Create the first administrator
 
 ```sh
 make local-admin
-```
-
-At the terminal prompts, enter your email, enter your chosen password, and repeat it. Password input is hidden. Use at least 14 characters and at most 72 UTF-8 bytes. Save the password for the next step. This password signs an employee into the HTTP API. The generated `DB_PASSWORD` in `.env` connects the application to PostgreSQL.
-
-The command runs the application image once against the local database, with HTTP disabled. It passes the password through standard input to a temporary file inside that container and removes the container when it finishes. Look for **Initial administrator created** and a successful exit. The account is active, has the ADMIN role, and stores a BCrypt hash. The database must contain zero employees. Once it has an account, sign in with that account on later runs. Loading the SQL test fixture into a fresh database also fills the users table, so use a separate database for that exercise.
-
-### 3. Make your first authenticated request
-
-Replace the email below with the one you entered. Curl prompts for the password.
-
-```sh
 curl --user admin@example.test http://127.0.0.1:8080/api/v1/auth/me
 ```
 
-Expect HTTP 200 and a response shaped like `{"id":"<uuid>","email":"admin@example.test","role":"ADMIN"}`. You can now paste the returned UUID into the employee lookup in [local Swagger UI](http://127.0.0.1:8080/swagger-ui.html). Click **Authorize**, enter the employee credentials, then use **Try it out**. The demo scripts also show the anonymous and signed-in responses side by side.
+At the first command, choose an employee email and a password of at least 14 Unicode characters and at most 72 UTF-8 bytes. Wait for **Initial administrator created**. For the second command, substitute that email and type the same password at the curl prompt. The response contains your ID, normalized email and `"role":"ADMIN"`.
+
+Bootstrap runs a one-shot container with HTTP disabled and requires an empty employee table. On later starts, use your existing account. Keep the generated `DB_PASSWORD` with the database volume. It authenticates the application's database connection.
+
+### Try an order
+
+With Python 3.9+ on your machine, run one complete sale against the local API. Use the ADMIN email you chose above. The demo creates fictional catalog records and prints each request and result.
 
 ```sh
-./demo/api/health.sh
-./demo/api/employee-access.sh admin@example.test
+python3 -m demo complete-orders admin@example.test
 ```
 
-For another port, prefix a demo command with `BASE_URL=http://127.0.0.1:8081`. The health and employee endpoints are:
+The demo receives 10 units, fulfills 3, then confirms and cancels a second order for 2. The result is **7 on hand, 0 reserved and 7 available**. For a custom HTTP port, prefix the command with `BASE_URL=http://127.0.0.1:8081`. To explore endpoints interactively, open Swagger UI and select **Authorize**. [Local Swagger UI](http://127.0.0.1:8080/swagger-ui.html) · [Employee setup, HTTP scenarios and SQL reports](demo/README.md)
 
-| Request                    | Access            | What you get                                                                |
-| -------------------------- | ----------------- | --------------------------------------------------------------------------- |
-| GET /livez and GET /readyz | Public            | Process health and readiness, including database connectivity for readiness |
-| GET /api/v1/auth/me        | ADMIN or OPERATOR | Your employee ID, normalized email and current role                         |
-| GET /api/v1/users/{id}     | ADMIN             | Employee details, including whether the account is active                   |
-| POST /api/v1/users | ADMIN | Create an active employee account and return its ID |
-| PUT /api/v1/users/{id}/role | ADMIN | Assign ADMIN or OPERATOR |
-| POST /api/v1/users/{id}/deactivate | ADMIN | Disable sign-in and retain the employee's history |
-| GET /api/v1/auth/csrf      | ADMIN or OPERATOR | CSRF cookie and a response containing the header name and masked token      |
+| Local operation | Command |
+| --- | --- |
+| Inspect services or follow logs | `make stack-status` or `make stack-logs` |
+| Stop and keep the database volume | `make stop-stack` |
+| Resume with the same accounts and orders | `make start-stack` |
+| List available commands | `make help` |
 
-For customers, products, warehouses and stock movements, see the [catalog and stock endpoint table](demo/README.md#catalog-and-stock).
+## Model and transaction boundaries
 
-HTTP Basic authenticates each request. Changes to an account's role or active flag take effect on its next request. CSRF protection on unsafe methods requires both the cookie and the token in the named header. Swagger and the OpenAPI JSON at `/v3/api-docs` are available locally. Other application routes default to denied.
+One Spring Boot service uses eight business tables for employees, customers, products, warehouses, stock levels, order headers, order items and physical movements. Controllers handle HTTP, services set transaction boundaries and repositories issue queries and locks. [Database diagram](docs/schema-design.drawio) · [Schema migration](src/main/resources/db/migration/)
 
-### 4. Add an employee and check their login
+| Operation on one order | On hand | Reserved | Available | Movement |
+| --- | ---: | ---: | ---: | --- |
+| Receive 10 and draft an order for 3 | 10 | 0 | 10 | IN +10 on receipt |
+| Confirm the draft | 10 | 3 | 7 | — |
+| Fulfill after confirmation | 7 | 0 | 7 | OUT −3 |
+| Cancel after confirmation (alternative ending) | 10 | 0 | 10 | — |
 
-From the repository root, use Bash and `jq`. Replace both emails with your own. The script prompts for the administrator password and then for the new employee password twice.
+An order uses one warehouse, whole units and PLN prices. Each line keeps the product name, SKU and price from the time it was added. Confirmation locks the order and the required stock rows in a consistent order. A shortage on any line rolls back the entire reservation. The reports reconcile reserved units against confirmed lines and physical stock against movement history. Partial shipments, payments, returns and warehouse transfers are outside the scope. [Order service](src/main/java/dev/bartlomiejmilosz/inventory/orders/OrderService.java) · [Reconciliation SQL](demo/sql/consistency.sql)
 
-```sh
-./demo/api/employee-accounts.sh admin@example.test create operator@example.test OPERATOR
-curl --user operator@example.test http://127.0.0.1:8080/api/v1/auth/me
-```
+| Access | Operations |
+| --- | --- |
+| Public | Process liveness at `/livez` and database readiness at `/readyz` |
+| OPERATOR and ADMIN | View catalog, stock and movements, receive stock, create and edit drafts, confirm, fulfill and cancel orders |
+| ADMIN | Also manage employees and catalog records and post stock corrections |
 
-Use the new password at the curl prompt. Expect `"role":"OPERATOR"`. Save the employee ID from the creation response for later changes. An operator can receive stock and process orders. An administrator can also manage the catalog, adjust stock and manage employees. To run the account commands against a deployed instance, set `BASE_URL` to its public HTTPS URL. [Role changes, deactivation and API responses](demo/README.md#employee-accounts)
+To add an operator, run `python3 -m demo employee-accounts admin@example.test create operator@example.test OPERATOR` with your ADMIN email. The program prompts for the administrator and employee passwords.
 
-### Stop and resume
-
-Use `make stack-status` for service state and `make stack-logs` to follow logs. Press Ctrl-C to leave the log viewer. Run `make stop-stack` when finished. It keeps the database volume. The next `make start-stack` reuses your data and employee login. Run `make help` for the full command list.
+HTTP Basic authenticates each request. For writes, fetch `GET /api/v1/auth/csrf`, retain its cookie and send the returned token in the named header with your credentials. The demo client handles this. OpenAPI is available in the local profile at `/v3/api-docs`.
 
 ## Develop and test
 
-**Run Java on your machine.** Install JDK 25 and check `java -version`. If the full Docker stack is running, use `make stop-stack` first to free the API port. Run `make run-local` to start PostgreSQL in Docker and the application in your terminal with the Maven Wrapper. The local database and administrator are shared with the full-stack workflow. Press Ctrl-C to stop Java, then `make stop-stack` to stop PostgreSQL. For an IDE, use `make start-db`, select profile `local`, and supply `DB_PASSWORD`, `DB_PORT` and `APP_PORT` from your local `.env` in the run configuration.
+| Task | From the repository root |
+| --- | --- |
+| Run the application on the host | Install JDK 25, stop the containerized app with `make stop-stack`, then use `make run-local`. It starts PostgreSQL and runs the Maven Wrapper. |
+| Run from an IDE | `make start-db`. Select JDK 25 and the `local` profile. Supply `DB_PASSWORD`, `DB_PORT` and `APP_PORT` from `.env`. |
+| Verify a change | With JDK 25 and Docker running, use `make verify-build` for Spotless, PostgreSQL integration tests and packaging. Use `make format-java` to apply formatting. |
+| Check a schema change | Add a versioned Flyway migration. Run `make validate-db-migrations` to check local history. Use `make repair-db-migrations` only after diagnosing a history mismatch. |
+| Bootstrap without the local app image | Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD_FILE` in `.env` and use `make bootstrap-admin` with JDK 25. Remove the private password file afterwards. |
 
-**Existing password-file workflow.** The Maven target `make bootstrap-admin` also works with JDK 25. Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD_FILE` in `.env`. Supply a private, single-line UTF-8 file at that path and remove it after successful creation. The interactive `make local-admin` reads the email and password from its prompts.
-
-**Verify a change.** With JDK 25 and Docker running, use:
-
-```sh
-make verify-build
-```
-
-This checks Java formatting, runs tests and packages the app. Testcontainers starts disposable PostgreSQL instances. The suite covers migrations, constraints, rollback, entity mappings, employee access, CSRF, catalog operations, draft editing, confirmation, fulfillment, cancellation, OpenAPI, transactional rollback and PostgreSQL lock contention. Use `make format-java` to apply the formatter. CI also builds the container, bootstraps a disposable administrator and runs the order lifecycle in Compose. It checks the SQL balances and observes both health probes during a database outage and after recovery. [CI workflow](.github/workflows/ci.yaml)
-
-**Work with the schema.** Flyway manages the business tables in `inventory` and the migration history in `flyway_history`. Hibernate validates the mappings on startup. Add a new versioned migration for changes to an applied schema. Use `make validate-db-migrations` to check local migration history. The separate `make repair-db-migrations` command changes history metadata and should be used only after investigating and resolving a mismatch. It does not apply missing structural changes. [Migrations](src/main/resources/db/migration/) · [SQL reports](demo/sql/) · [Demo and test data](demo/sql/seed.sql)
-
-**Explore orders and stock in SQL.** With JDK 25, Docker and the local environment from step 1, run the following from the repository root. Run setup once. It creates a separate `order_inventory_demo` database, migrates it and loads sample orders. The HTTP API keeps using `order_inventory`.
-
-```sh
-./demo/sql/run.sh setup
-./demo/sql/run.sh orders
-./demo/sql/run.sh stock
-./demo/sql/run.sh consistency
-```
-
-Look for order DEMO-003 totaling 23.00 PLN and WIDGET availability of 7 in NORTH and 4 in SOUTH. Both consistency queries should return zero rows. Repeat the last three commands whenever you want to explore the data. [SQL demo guide](demo/README.md)
-
-**Try stock operations over HTTP.** With the local stack running, sign in as an administrator and run `./demo/api/catalog-stock.sh admin@example.test`. The script uses `jq` and creates fictional catalog data in the local application database. It demonstrates a receipt, a correction, and the recorded history. [Catalog and stock demo](demo/README.md#catalog-and-stock)
-
-**Try draft orders over HTTP.** Run `./demo/api/draft-orders.sh admin@example.test` as ADMIN with `jq` installed. It creates a draft, shows how saved line prices survive catalog edits, and checks that inventory remains unchanged. [Draft order demo](demo/README.md#draft-orders)
-
-**Try confirmation and reservation over HTTP.** Run `./demo/api/confirm-orders.sh admin@example.test` as ADMIN with `jq` installed. The script shows two orders competing for available units and verifies that confirmation changes reservations while physical stock remains on hand. [Confirmation demo](demo/README.md#confirmation-and-reservations)
-
-**Try the full order lifecycle over HTTP.** Run `./demo/api/complete-orders.sh admin@example.test` as ADMIN with `jq` installed. It fulfills one confirmed order, cancels another and cancels a draft. The script checks the final stock and the outbound movement. [Fulfillment and cancellation demo](demo/README.md#fulfillment-and-cancellation)
+Testcontainers exercises migrations, rollback, lock contention and role checks on real PostgreSQL. CI also builds the Docker image, runs the Python walkthroughs, reconciles stock and checks readiness during a database outage and after recovery. The Docker build already excludes the demo directory. Keep it in your development checkout because the integration tests reuse its SQL fixtures. [CI workflow](.github/workflows/ci.yaml)
 
 ## Deploy on a server
 
-The deployment configuration runs one application container on a Linux Docker host. A reverse proxy on that host accepts HTTPS traffic and forwards it to the application's loopback port. The application connects over TLS to a separately managed PostgreSQL 17 server. Provision the host, DNS name, proxy and database first. Run the shell commands from a checkout of the intended release on the Docker host, in a fresh shell so exported local settings cannot override the deployment environment.
+The deployment has three parts: a reverse proxy for public HTTPS, one application container on the host's loopback port and a separately managed PostgreSQL 17 server reached over TLS. Prepare a Linux host with Git, Bash, Make, curl and Docker Compose v2, a DNS name and access to the database. Work from a clean checkout in a fresh shell so local environment variables do not override deploy settings.
 
 ### 1. Choose the application image
 
-To build on the deployment host, give the image a tag identifying the checked-out revision:
+Build the revision you want to deploy and print the image reference for step 3.
 
 ```sh
-git rev-parse --short HEAD
-docker build -t "order-inventory-system:$(git rev-parse --short HEAD)" .
+image="order-inventory-system:$(git rev-parse --short HEAD)"
+docker build -t "$image" .
+printf '%s\n' "$image"
 ```
 
-Build from a clean release checkout so the tag identifies the source. Use the resulting tag as `APP_IMAGE` below. If you publish images separately, pull your image onto the host and use its registry reference pinned by digest. The repository CI builds and tests an image. Publishing to a registry is a separate step.
+Set `APP_IMAGE` to this tag. If you already publish a registry image, pull it and use its digest instead.
 
 ### 2. Provision a new database
 
-Use a PostgreSQL administrator with permission to create a database and roles. From the repository root on a machine with `psql`, set the connection to your external server. Replace the hostname, administrator login and CA path below with your own. Check the destination shown by the first command before running the provisioning script.
+On a machine with `psql`, use a PostgreSQL administrator that can create databases and roles. Substitute your hostname, login and CA path. Verify the destination with `\conninfo` before provisioning.
 
 ```sh
 export PGHOST=db.example.com PGPORT=5432 PGUSER=your_db_admin
@@ -209,7 +158,7 @@ curl -fsS http://127.0.0.1:8080/readyz
 make deploy-admin
 ```
 
-Use the configured `APP_PORT` in the health check. Wait for `UP` before creating the first employee. At the prompts choose the employee email and password for this installation. The bootstrap container uses the same deployment image, TLS settings and database roles as the running service. Run this command once per fresh database.
+Use your configured `APP_PORT` in the health check. Once it returns `UP`, choose the first employee email and password at the bootstrap prompts. Run bootstrap once per fresh database.
 
 ### 5. Enable public HTTPS
 
@@ -240,7 +189,7 @@ Use the email from step 4. A successful public check yields `UP` followed by you
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Local startup reports a port already in use              | Choose a free APP_PORT or DB_PORT in .env, then rerun make start-stack. For IDE development, stop the containerized app before running the JVM.                             |
 | PostgreSQL rejects the local password after editing .env | The database initializes credentials only on first volume creation. Restore the matching DB_PASSWORD or change the database role password through an authorized connection. |
-| Bootstrap says the users table must be empty             | An account already exists, possibly from a fixture. Use the existing login or a separate fresh demo database. The bootstrap command cannot reset a password.                |
+| Bootstrap says the users table must be empty             | Sign in with the existing employee account. The first-admin command requires an empty employee table. Run SQL fixtures in their separate demo database.                |
 | Login returns 401                                        | Use an active employee email and its employee password. Curl prompts when given only the email.                                                                             |
 | Request returns 403                                      | Check the employee's role and the allowed endpoint. Unsafe methods also require CSRF protection.                                                                            |
 | Deployment fails readiness                               | Inspect app logs. Verify DB_HOST against the certificate, CA trust, database reachability, secret permissions, and both roles' credentials and schema grants.               |
